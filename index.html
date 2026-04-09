@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>慢慢贴</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>📝</text></svg>" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#FFF9C4" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="慢慢贴" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <style>
+    /* ========== 全局 ========== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #e8f4f8 0%, #fce4ec 100%);
+      font-family: 'Press Start 2P', monospace;
+      overflow: auto;
+      position: relative;
+    }
+
+    /* ========== 便利贴主体 ========== */
+    #sticky {
+      position: absolute;
+      width: 340px;
+      background: #FFF9C4;
+      border-radius: 8px;
+      box-shadow: 4px 4px 0px rgba(0,0,0,0.15), 0 2px 10px rgba(0,0,0,0.1);
+      padding: 16px;
+      user-select: none;
+      transition: opacity 0.1s;
+      /* 折角效果 */
+      --corner-size: 20px;
+      clip-path: polygon(
+        0 0,
+        calc(100% - var(--corner-size)) 0,
+        100% var(--corner-size),
+        100% 100%,
+        0 100%
+      );
+    }
+    #sticky::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: var(--corner-size, 20px);
+      height: var(--corner-size, 20px);
+      background: #e6d97a;
+      clip-path: polygon(0 0, 100% 100%, 100% 0);
+    }
+    #sticky.dragging { opacity: 0.75; }
+
+    /* ========== 头部 ========== */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    #header h1 {
+      font-size: 11px;
+      color: #5d4037;
+      letter-spacing: 1px;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: transform 0.1s;
+    }
+    .icon-btn:active { transform: scale(0.85); }
+
+    /* ========== 彩蛋栏 ========== */
+    #egg-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      font-size: 9px;
+      color: #795548;
+    }
+    #egg-count { font-weight: bold; color: #e65100; }
+    .pixel-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 4px 8px;
+      border: 2px solid #5d4037;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #fff8e1;
+      color: #5d4037;
+      box-shadow: 2px 2px 0px #5d4037;
+      transition: all 0.08s;
+    }
+    .pixel-btn:active {
+      box-shadow: none;
+      transform: translate(2px, 2px);
+    }
+    .pixel-btn.primary { background: #ffe082; }
+    .pixel-btn.comfort { background: #f8bbd0; }
+
+    /* ========== 小动物区域 ========== */
+    #pet-zone {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    #pet-display {
+      font-size: 28px;
+      cursor: pointer;
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    #pet-display:hover { transform: scale(1.15); }
+    #pet-display.bounce {
+      animation: petBounce 0.4s ease;
+    }
+    @keyframes petBounce {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.35) rotate(-8deg); }
+      70%  { transform: scale(0.9) rotate(4deg); }
+      100% { transform: scale(1); }
+    }
+    #pet-name { font-size: 8px; color: #6d4c41; }
+
+    /* ========== 气泡提示 ========== */
+    #bubble {
+      position: absolute;
+      right: 50px;
+      top: 80px;
+      background: #fff;
+      border: 2px solid #5d4037;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 8px;
+      color: #333;
+      max-width: 180px;
+      line-height: 1.6;
+      box-shadow: 2px 2px 0 #5d4037;
+      z-index: 10;
+      display: none;
+      word-break: break-all;
+    }
+    #bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      right: 14px;
+      border: 4px solid transparent;
+      border-top-color: #5d4037;
+    }
+
+    /* ========== 孵化动画 ========== */
+    #hatch-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #hatch-overlay.show { display: flex; }
+    #hatch-box {
+      background: #FFF9C4;
+      border: 3px solid #5d4037;
+      border-radius: 12px;
+      padding: 24px 32px;
+      text-align: center;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      color: #5d4037;
+      box-shadow: 6px 6px 0 #5d4037;
+      animation: hatchIn 0.4s ease;
+    }
+    @keyframes hatchIn {
+      from { transform: scale(0.6); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    #hatch-anim { font-size: 52px; display: block; margin-bottom: 12px; animation: hatchPop 0.6s ease 0.3s both; }
+    @keyframes hatchPop {
+      0%   { transform: scale(0.4); }
+      60%  { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+
+    /* ========== 任务列表 ========== */
+    #task-list {
+      list-style: none;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    #task-list::-webkit-scrollbar { width: 4px; }
+    #task-list::-webkit-scrollbar-thumb { background: #c8b97a; border-radius: 2px; }
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 2px;
+      border-bottom: 1px dashed #e0d68a;
+      font-size: 9px;
+      color: #4e342e;
+    }
+    .task-item input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: #f9a825;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .task-item .task-text {
+      flex: 1;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+    .task-item.done .task-text {
+      text-decoration: line-through;
+      color: #bcaaa4;
+    }
+    .task-item .del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      flex-shrink: 0;
+      opacity: 0.5;
+      transition: opacity 0.1s;
+    }
+    .task-item .del-btn:hover { opacity: 1; }
+
+    /* ========== 添加任务 ========== */
+    #add-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    #new-task-input {
+      flex: 1;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 5px 7px;
+      border: 2px solid #c8b97a;
+      border-radius: 4px;
+      background: #fffde7;
+      color: #4e342e;
+      outline: none;
+    }
+    #new-task-input:focus { border-color: #f9a825; }
+
+    /* ========== 底部按钮行 ========== */
+    #bottom-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    /* ========== 底部小字 ========== */
+    #footer {
+      font-size: 7px;
+      color: #a1887f;
+      text-align: center;
+      margin-top: 6px;
+      line-height: 1.8;
+    }
+
+    /* ========== 收集册弹窗 ========== */
+    #collection-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #collection-modal.show { display: flex; }
+    #collection-box {
+      background: #FFF9C4;
+      border: 3px solid #5d4037;
+      border-radius: 12px;
+      padding: 20px;
+      width: min(320px, 90vw);
+      max-height: 80vh;
+      overflow-y: auto;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: #5d4037;
+      box-shadow: 6px 6px 0 #5d4037;
+    }
+    #collection-box h2 { font-size: 10px; margin-bottom: 12px; }
+    .coll-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px;
+      border-bottom: 1px dashed #c8b97a;
+      font-size: 8px;
+    }
+    .coll-emoji { font-size: 22px; }
+    .coll-info { line-height: 1.8; }
+    #close-coll {
+      float: right;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+    }
+
+    /* ========== 颜色选择器 ========== */
+    #color-picker-popup {
+      position: absolute;
+      top: 36px;
+      right: 8px;
+      background: #fff;
+      border: 2px solid #5d4037;
+      border-radius: 8px;
+      padding: 8px;
+      display: none;
+      gap: 6px;
+      flex-wrap: wrap;
+      width: 110px;
+      box-shadow: 3px 3px 0 #5d4037;
+      z-index: 20;
+    }
+    #color-picker-popup.show { display: flex; }
+    .color-dot {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid #5d4037;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .color-dot:hover { transform: scale(1.2); }
+    .color-dot.active { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #5d4037; }
+
+    /* ========== 收集册网格 ========== */
+    #coll-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .coll-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #fffde7;
+      border: 2px solid #c8b97a;
+      border-radius: 6px;
+      padding: 6px 4px;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.1s;
+      font-size: 7px;
+      color: #5d4037;
+      text-align: center;
+      gap: 2px;
+    }
+    .coll-cell:hover { transform: scale(1.05); }
+    .coll-cell.current { border-color: #f9a825; background: #fff9c4; box-shadow: 0 0 0 2px #f9a825; }
+    .coll-cell .cell-emoji { font-size: 20px; }
+    .coll-cell .cell-count { color: #a1887f; font-size: 6px; }
+
+    /* ========== 历史任务弹窗 ========== */
+    #history-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none; align-items: center; justify-content: center;
+      z-index: 200;
+    }
+    #history-modal.show { display: flex; }
+    #history-box {
+      background: #FFF9C4;
+      border: 3px solid #5d4037;
+      border-radius: 12px;
+      padding: 20px;
+      width: min(320px, 90vw);
+      max-height: 80vh;
+      overflow-y: auto;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: #5d4037;
+      box-shadow: 6px 6px 0 #5d4037;
+    }
+    #history-box h2 { font-size: 10px; margin-bottom: 12px; }
+    .hist-day {
+      border: 1px solid #c8b97a;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .hist-day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      background: #fffde7;
+      cursor: pointer;
+      font-size: 8px;
+    }
+    .hist-day-header:hover { background: #fff9c4; }
+    .hist-day-tasks {
+      display: none;
+      padding: 6px 8px;
+      background: #fff;
+      font-size: 7px;
+      line-height: 2;
+    }
+    .hist-day-tasks.open { display: block; }
+    .hist-task-row { display: flex; align-items: center; gap: 4px; }
+    .hist-task-row .done-mark { color: #f9a825; }
+    .hist-task-row .undone-mark { color: #bcaaa4; }
+
+    /* ========== 昨日顺延对话框 ========== */
+    #yesterday-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none; align-items: center; justify-content: center;
+      z-index: 300;
+    }
+    #yesterday-modal.show { display: flex; }
+    #yesterday-box {
+      background: #FFF9C4;
+      border: 3px solid #5d4037;
+      border-radius: 12px;
+      padding: 24px 20px;
+      width: min(300px, 88vw);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: #5d4037;
+      box-shadow: 6px 6px 0 #5d4037;
+      text-align: center;
+      line-height: 2;
+    }
+    #yesterday-box p { margin-bottom: 16px; font-size: 8px; }
+    #yesterday-box .btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+    /* ========== PWA 安装条 ========== */
+    #pwa-banner {
+      position: fixed;
+      bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: #5d4037;
+      color: #fff9c4;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+      z-index: 400;
+    }
+    #pwa-banner.show { display: flex; }
+    #pwa-install-btn { background: #ffe082; color: #5d4037; border: none; border-radius: 4px;
+      font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 4px 8px; cursor: pointer; }
+    #pwa-dismiss-btn { background: none; border: none; color: #fff9c4; cursor: pointer; font-size: 12px; }
+
+    /* ========== 响应式：手机 ========== */
+    @media (max-width: 480px) {
+      #sticky {
+        width: 90vw !important;
+        left: 5vw !important;
+        top: 20px !important;
+        position: relative;
+      }
+      body { display: flex; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 便利贴 -->
+<div id="sticky">
+  <!-- 折角 pseudo-element via CSS -->
+
+  <!-- 头部 -->
+  <div id="header">
+    <h1>📝 慢慢贴</h1>
+    <div style="display:flex;gap:2px">
+      <button class="icon-btn" id="open-history" title="历史任务">📅</button>
+      <button class="icon-btn" id="open-color" title="换颜色">🎨</button>
+      <button class="icon-btn" id="open-coll" title="收集册">📖</button>
+    </div>
+  </div>
+  <!-- 颜色选择器弹出层 -->
+  <div id="color-picker-popup"></div>
+
+  <!-- 彩蛋栏 -->
+  <div id="egg-bar">
+    <span>🥚</span>
+    <span id="egg-count">0</span>
+    <span>颗彩蛋</span>
+    <button class="pixel-btn primary" id="hatch-btn" style="display:none">孵化</button>
+  </div>
+
+  <!-- 小动物 & 气泡 -->
+  <div id="pet-zone">
+    <span id="pet-name"></span>
+    <span id="pet-display" title="点击互动"></span>
+  </div>
+  <div id="bubble"></div>
+
+  <!-- 任务列表 -->
+  <ul id="task-list"></ul>
+
+  <!-- 添加任务 -->
+  <div id="add-row">
+    <input id="new-task-input" type="text" placeholder="写下一件小事…" maxlength="40" />
+    <button class="pixel-btn primary" id="add-task-btn">贴任务</button>
+  </div>
+
+  <!-- 底部按钮 -->
+  <div id="bottom-bar">
+    <button class="pixel-btn comfort" id="comfort-btn">求安慰 🤗</button>
+    <button class="pixel-btn" id="defer-btn">顺延未完成 ➡️</button>
+  </div>
+
+  <!-- 页脚 -->
+  <div id="footer">不着急，慢慢贴，能写下来已经很棒了。</div>
+</div>
+
+<!-- 孵化动画弹窗 -->
+<div id="hatch-overlay">
+  <div id="hatch-box">
+    <span id="hatch-anim">🥚</span>
+    <div id="hatch-msg">正在孵化…</div>
+  </div>
+</div>
+
+<!-- 历史任务弹窗 -->
+<div id="history-modal">
+  <div id="history-box">
+    <button class="pixel-btn" id="close-history" style="float:right;font-size:8px">✕ 关闭</button>
+    <h2>📅 历史任务</h2>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<!-- 昨日顺延对话框 -->
+<div id="yesterday-modal">
+  <div id="yesterday-box">
+    <p id="yesterday-msg"></p>
+    <div class="btn-row">
+      <button class="pixel-btn primary" id="yesterday-keep">移到今天</button>
+      <button class="pixel-btn comfort" id="yesterday-drop">让它们消失</button>
+      <button class="pixel-btn" id="yesterday-close">先不管</button>
+    </div>
+  </div>
+</div>
+
+<!-- PWA 安装横幅 -->
+<div id="pwa-banner">
+  <span>📲 添加到桌面</span>
+  <button id="pwa-install-btn">安装</button>
+  <button id="pwa-dismiss-btn">✕</button>
+</div>
+
+<!-- 收集册弹窗 -->
+<div id="collection-modal">
+  <div id="collection-box">
+    <button class="pixel-btn" id="close-coll">✕ 关闭</button>
+    <h2>📖 小动物收集册</h2>
+    <div id="coll-egg-total"></div>
+    <div id="coll-grid"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  常量与数据
+// ============================================================
+const ANIMALS = [
+  { emoji: '🐱', name: '小咪' },
+  { emoji: '🐶', name: '小汪' },
+  { emoji: '🐰', name: '小兔兔' },
+  { emoji: '🐍', name: '小蛇蛇' },
+  { emoji: '🐹', name: '仓鼠球' },
+  { emoji: '🦊', name: '小狐' },
+  { emoji: '🐸', name: '呱呱' },
+  { emoji: '🐼', name: '团团' },
+];
+
+const ENCOURAGE = [
+  '你从"不想做"到"做了"，这中间的努力只有你自己知道。',
+  '完成一件事，不管多小，都是真实发生的进展。',
+  '你做到了。不需要再证明什么了。',
+  '每一步都算数，包括刚才那一步。',
+  '你没有落后。你一直在以自己的节奏前进。',
+  '这件事现在已经完成了，它不会再来打扰你了。',
+  '你比昨天的自己多做了一件事。',
+];
+
+const COMFORT = [
+  '你没有失败，你只是在为"能做到"的那天积蓄能量。',
+  '今天不想动是正常的，大脑也需要充电。',
+  '休息不是偷懒，是为了之后能继续走。',
+  '什么都没做也没关系，你今天还是存在着，这件事本身就有价值。',
+  '不用和任何人比节奏，你的节奏就是对的节奏。',
+  '任务可以等，但你现在的感受更重要。',
+];
+
+const PET_TALK = [
+  (n) => `${n} 待在你旁边，没有别的意思，就是陪着你。`,
+  (n) => `${n} 说：今天不想做也没关系，我们可以一起发呆。`,
+  (n) => `${n} 轻轻靠了过来，什么也没说。`,
+  (n) => `${n} 提醒你：你已经很久没有喝水了，要不要去喝一口。`,
+  (n) => `${n} 说：不用着急，我不会走的。`,
+];
+
+// ============================================================
+//  localStorage 工具
+// ============================================================
+const LS = {
+  get(k, def) {
+    try { return JSON.parse(localStorage.getItem(k)) ?? def; }
+    catch { return def; }
+  },
+  set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
+};
+
+// ============================================================
+//  状态
+// ============================================================
+let tasks     = LS.get('sl_tasks', []);
+let eggs      = LS.get('sl_eggs', 0);
+let currentPet = LS.get('sl_pet', null);   // { emoji, name }
+let collection = LS.get('sl_collection', []); // [{ emoji, name, date }]
+let totalEggs  = LS.get('sl_total_eggs', 0);
+
+// 新增状态
+let stickyColor = LS.get('sl_color', '#FFF9C4');
+// 历史任务记录：{ 'YYYY/M/D': { tasks: [{text,done}], total, done } }
+let taskHistory = LS.get('sl_history', {});
+// 记录上次打开的日期，用于昨日检测
+let lastOpenDate = LS.get('sl_last_date', null);
+const todayStr = new Date().toLocaleDateString('zh-CN');
+
+const COLOR_PALETTE = [
+  { color: '#FFF9C4', label: '淡黄', corner: '#e6d97a' },
+  { color: '#FCE4EC', label: '淡粉', corner: '#e8a0b4' },
+  { color: '#E3F2FD', label: '淡蓝', corner: '#90c8ef' },
+  { color: '#E8F5E9', label: '淡绿', corner: '#92c99a' },
+  { color: '#EDE7F6', label: '浅紫', corner: '#b39ddb' },
+];
+
+// ============================================================
+//  DOM 引用
+// ============================================================
+const sticky     = document.getElementById('sticky');
+const eggCount   = document.getElementById('egg-count');
+const hatchBtn   = document.getElementById('hatch-btn');
+const petDisplay = document.getElementById('pet-display');
+const petName    = document.getElementById('pet-name');
+const bubble     = document.getElementById('bubble');
+const taskList   = document.getElementById('task-list');
+const newInput   = document.getElementById('new-task-input');
+const addBtn     = document.getElementById('add-task-btn');
+const comfortBtn = document.getElementById('comfort-btn');
+const deferBtn   = document.getElementById('defer-btn');
+const hatchOverlay = document.getElementById('hatch-overlay');
+const hatchAnim  = document.getElementById('hatch-anim');
+const hatchMsg   = document.getElementById('hatch-msg');
+const collModal  = document.getElementById('collection-modal');
+const openCollBtn = document.getElementById('open-coll');
+const closeCollBtn = document.getElementById('close-coll');
+
+// 新增 DOM 引用
+const openColorBtn   = document.getElementById('open-color');
+const colorPickerPop = document.getElementById('color-picker-popup');
+const openHistoryBtn = document.getElementById('open-history');
+const historyModal   = document.getElementById('history-modal');
+const closeHistoryBtn= document.getElementById('close-history');
+const historyList    = document.getElementById('history-list');
+const yesterdayModal = document.getElementById('yesterday-modal');
+const pwaBanner      = document.getElementById('pwa-banner');
+const pwaInstallBtn  = document.getElementById('pwa-install-btn');
+const pwaDismissBtn  = document.getElementById('pwa-dismiss-btn');
+
+// ============================================================
+//  保存函数
+// ============================================================
+function save() {
+  LS.set('sl_tasks', tasks);
+  LS.set('sl_eggs', eggs);
+  LS.set('sl_pet', currentPet);
+  LS.set('sl_collection', collection);
+  LS.set('sl_total_eggs', totalEggs);
+  // 每次保存时更新今日历史快照
+  taskHistory[todayStr] = {
+    tasks: tasks.map(t => ({ text: t.text, done: t.done })),
+    total: tasks.length,
+    done: tasks.filter(t => t.done).length,
+  };
+  LS.set('sl_history', taskHistory);
+}
+
+// ============================================================
+//  便利贴颜色自定义
+// ============================================================
+function applyColor(hex) {
+  stickyColor = hex;
+  sticky.style.background = hex;
+  const palette = COLOR_PALETTE.find(c => c.color === hex) || COLOR_PALETTE[0];
+  sticky.style.setProperty('--corner-color', palette.corner);
+  // 更新折角伪元素颜色（通过动态 style 标签）
+  let s = document.getElementById('corner-style');
+  if (!s) { s = document.createElement('style'); s.id = 'corner-style'; document.head.appendChild(s); }
+  s.textContent = `#sticky::before { background: ${palette.corner} !important; }`;
+  LS.set('sl_color', hex);
+}
+
+function buildColorPicker() {
+  colorPickerPop.innerHTML = '';
+  COLOR_PALETTE.forEach(p => {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot' + (p.color === stickyColor ? ' active' : '');
+    dot.style.background = p.color;
+    dot.title = p.label;
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applyColor(p.color);
+      buildColorPicker(); // 刷新高亮
+      colorPickerPop.classList.remove('show');
+    });
+    colorPickerPop.appendChild(dot);
+  });
+}
+
+openColorBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  buildColorPicker();
+  colorPickerPop.classList.toggle('show');
+});
+// 点击便利贴外部关闭颜色选择器
+document.addEventListener('click', () => colorPickerPop.classList.remove('show'));
+
+// ============================================================
+//  彩蛋 UI
+// ============================================================
+function renderEggs() {
+  eggCount.textContent = eggs;
+  hatchBtn.style.display = eggs >= 1 ? 'inline-block' : 'none';
+}
+
+function addEgg(n = 1) {
+  eggs += n;
+  totalEggs += n;
+  save();
+  renderEggs();
+}
+
+// ============================================================
+//  气泡提示
+// ============================================================
+let bubbleTimer = null;
+function showBubble(text, duration = 2500) {
+  bubble.textContent = text;
+  bubble.style.display = 'block';
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => { bubble.style.display = 'none'; }, duration);
+}
+
+// ============================================================
+//  小动物
+// ============================================================
+function renderPet() {
+  if (currentPet) {
+    petDisplay.textContent = currentPet.emoji;
+    petName.textContent = currentPet.name;
+  } else {
+    petDisplay.textContent = '';
+    petName.textContent = '';
+  }
+}
+
+petDisplay.addEventListener('click', () => {
+  if (!currentPet) return;
+  petDisplay.classList.remove('bounce');
+  void petDisplay.offsetWidth; // reflow
+  petDisplay.classList.add('bounce');
+  const msg = PET_TALK[Math.floor(Math.random() * PET_TALK.length)](currentPet.name);
+  showBubble(msg);
+  // 20% 概率额外送彩蛋
+  if (Math.random() < 0.2) {
+    addEgg(1);
+    setTimeout(() => showBubble(`🥚 ${currentPet.name} 偷偷放了一颗彩蛋！`, 2500), 2600);
+  }
+});
+
+// ============================================================
+//  孵化
+// ============================================================
+hatchBtn.addEventListener('click', () => {
+  if (eggs < 1) return;
+  eggs--;
+  save();
+  renderEggs();
+
+  const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  // 动画序列: 🥚 → 裂缝 → 动物
+  hatchAnim.textContent = '🥚';
+  hatchMsg.textContent = '正在孵化…';
+  hatchOverlay.classList.add('show');
+
+  setTimeout(() => { hatchAnim.textContent = '🐣'; hatchMsg.textContent = '蛋壳裂开了！'; }, 700);
+  setTimeout(() => {
+    hatchAnim.textContent = animal.emoji;
+    hatchMsg.textContent = `${animal.name} 出来啦！`;
+  }, 1400);
+  setTimeout(() => {
+    hatchOverlay.classList.remove('show');
+    currentPet = animal;
+    // 加入收集册
+    collection.push({ emoji: animal.emoji, name: animal.name, date: new Date().toLocaleDateString('zh-CN') });
+    save();
+    renderPet();
+    showBubble(`🎊 欢迎 ${animal.name} ${animal.emoji}！点击它来互动吧~`, 3000);
+  }, 2400);
+});
+
+// 点击遮罩不关闭（让动画播完）
+hatchOverlay.addEventListener('click', () => {});
+
+// ============================================================
+//  任务渲染
+// ============================================================
+function renderTasks() {
+  taskList.innerHTML = '';
+  tasks.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'task-item' + (t.done ? ' done' : '');
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = t.done;
+    cb.addEventListener('change', () => toggleTask(i));
+
+    const span = document.createElement('span');
+    span.className = 'task-text';
+    span.textContent = t.text;
+
+    const del = document.createElement('button');
+    del.className = 'del-btn';
+    del.textContent = '🗑️';
+    del.title = '删除';
+    del.addEventListener('click', () => deleteTask(i));
+
+    li.appendChild(cb);
+    li.appendChild(span);
+    li.appendChild(del);
+    taskList.appendChild(li);
+  });
+}
+
+function addTask() {
+  const text = newInput.value.trim();
+  if (!text) return;
+  tasks.push({ text, done: false });
+  newInput.value = '';
+  save();
+  renderTasks();
+}
+
+function toggleTask(i) {
+  if (tasks[i].done) {
+    // 取消勾选
+    tasks[i].done = false;
+  } else {
+    tasks[i].done = true;
+    // 鼓励 + 彩蛋
+    const msg = ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)];
+    showBubble(msg);
+    addEgg(1);
+  }
+  save();
+  renderTasks();
+}
+
+function deleteTask(i) {
+  tasks.splice(i, 1);
+  save();
+  renderTasks();
+}
+
+addBtn.addEventListener('click', addTask);
+newInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+
+// ============================================================
+//  求安慰
+// ============================================================
+comfortBtn.addEventListener('click', () => {
+  const msg = COMFORT[Math.floor(Math.random() * COMFORT.length)];
+  showBubble(msg, 3500);
+  // 30% 概率赠彩蛋（心软机制）
+  if (Math.random() < 0.3) {
+    addEgg(1);
+    setTimeout(() => showBubble('🥚 悄悄给你一颗彩蛋，因为你值得', 3000), 4000);
+  }
+});
+
+// ============================================================
+//  顺延（保留未完成任务，不删除）
+// ============================================================
+deferBtn.addEventListener('click', () => {
+  const undone = tasks.filter(t => !t.done).length;
+  if (undone === 0) {
+    showBubble('所有任务都完成啦！你太厉害了 🎉', 2500);
+  } else {
+    showBubble(`${undone} 件小事顺延到明天，没关系的 🌙`, 3000);
+  }
+});
+
+// ============================================================
+//  收集册（网格版，可切换当前小动物）
+// ============================================================
+openCollBtn.addEventListener('click', () => {
+  document.getElementById('coll-egg-total').textContent = `累计彩蛋：${totalEggs} 🥚`;
+  const grid = document.getElementById('coll-grid');
+  grid.innerHTML = '';
+  if (collection.length === 0) {
+    grid.innerHTML = '<div style="padding:12px;font-size:8px;color:#a1887f;grid-column:1/-1">还没有小动物，快去孵化吧</div>';
+  } else {
+    // 按 emoji+name 去重并统计次数
+    const map = {};
+    collection.forEach(item => {
+      const key = item.emoji + item.name;
+      if (!map[key]) map[key] = { ...item, count: 0 };
+      map[key].count++;
+    });
+    Object.values(map).forEach(item => {
+      const cell = document.createElement('div');
+      const isCurrent = currentPet && currentPet.emoji === item.emoji && currentPet.name === item.name;
+      cell.className = 'coll-cell' + (isCurrent ? ' current' : '');
+      cell.innerHTML = `<span class="cell-emoji">${item.emoji}</span>
+        <span>${item.name}</span>
+        <span class="cell-count">×${item.count}</span>`;
+      cell.title = isCurrent ? '当前陪伴' : '点击切换陪伴';
+      cell.addEventListener('click', () => {
+        currentPet = { emoji: item.emoji, name: item.name };
+        save();
+        renderPet();
+        collModal.classList.remove('show');
+        showBubble(`${item.emoji} ${item.name} 来陪你了。`, 2500);
+      });
+      grid.appendChild(cell);
+    });
+  }
+  collModal.classList.add('show');
+});
+closeCollBtn.addEventListener('click', () => collModal.classList.remove('show'));
+collModal.addEventListener('click', (e) => { if (e.target === collModal) collModal.classList.remove('show'); });
+
+// ============================================================
+//  历史任务
+// ============================================================
+openHistoryBtn.addEventListener('click', () => {
+  historyList.innerHTML = '';
+  const dates = Object.keys(taskHistory).sort((a, b) => {
+    // 按日期降序
+    return new Date(b.replace(/\//g, '-')) - new Date(a.replace(/\//g, '-'));
+  });
+  if (dates.length === 0) {
+    historyList.innerHTML = '<div style="padding:12px;font-size:8px;color:#a1887f">还没有任何历史记录</div>';
+  } else {
+    dates.forEach(date => {
+      const snap = taskHistory[date];
+      const dayDiv = document.createElement('div');
+      dayDiv.className = 'hist-day';
+      const header = document.createElement('div');
+      header.className = 'hist-day-header';
+      header.innerHTML = `<span>${date}</span><span>${snap.done}/${snap.total} 完成</span>`;
+      const tasksDiv = document.createElement('div');
+      tasksDiv.className = 'hist-day-tasks';
+      (snap.tasks || []).forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'hist-task-row';
+        row.innerHTML = `<span class="${t.done ? 'done-mark' : 'undone-mark'}">${t.done ? '✓' : '○'}</span>
+          <span style="color:${t.done ? '#5d4037' : '#bcaaa4'}">${t.text}</span>`;
+        tasksDiv.appendChild(row);
+      });
+      header.addEventListener('click', () => tasksDiv.classList.toggle('open'));
+      dayDiv.appendChild(header);
+      dayDiv.appendChild(tasksDiv);
+      historyList.appendChild(dayDiv);
+    });
+  }
+  historyModal.classList.add('show');
+});
+closeHistoryBtn.addEventListener('click', () => historyModal.classList.remove('show'));
+historyModal.addEventListener('click', (e) => { if (e.target === historyModal) historyModal.classList.remove('show'); });
+
+// ============================================================
+//  昨日顺延检测
+// ============================================================
+function checkYesterday() {
+  if (lastOpenDate && lastOpenDate !== todayStr) {
+    // 有昨日未完成任务
+    const undone = tasks.filter(t => !t.done);
+    if (undone.length > 0) {
+      document.getElementById('yesterday-msg').textContent =
+        `昨天还有 ${undone.length} 个任务没做。你想移到今天，还是让它们消失？`;
+      yesterdayModal.classList.add('show');
+    }
+  }
+  // 更新上次打开日期
+  LS.set('sl_last_date', todayStr);
+  lastOpenDate = todayStr;
+}
+
+document.getElementById('yesterday-keep').addEventListener('click', () => {
+  // 重置未完成任务状态（它们本来就是 done:false，不需操作），只关闭弹窗
+  yesterdayModal.classList.remove('show');
+  showBubble('未完成的任务留着，不着急，慢慢来。', 3000);
+});
+document.getElementById('yesterday-drop').addEventListener('click', () => {
+  tasks = tasks.filter(t => t.done);
+  save();
+  renderTasks();
+  yesterdayModal.classList.remove('show');
+  showBubble('它们已经消失了，今天轻装出发。', 3000);
+});
+document.getElementById('yesterday-close').addEventListener('click', () => {
+  yesterdayModal.classList.remove('show');
+});
+
+// ============================================================
+//  PWA 安装
+// ============================================================
+
+// 用 Canvas 生成 PNG 图标，注入动态 manifest（解决 Chrome 要求 PNG 的问题）
+function buildPWAManifest() {
+  function drawIcon(size) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    const r = size * 0.12;
+
+    // 圆角背景
+    ctx.fillStyle = '#FFF9C4';
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(size - r, 0);
+    ctx.quadraticCurveTo(size, 0, size, r);
+    ctx.lineTo(size, size - r);
+    ctx.quadraticCurveTo(size, size, size - r, size);
+    ctx.lineTo(r, size); ctx.quadraticCurveTo(0, size, 0, size - r);
+    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath(); ctx.fill();
+
+    // 折角
+    const cs = size * 0.22;
+    ctx.fillStyle = '#e6d97a';
+    ctx.beginPath();
+    ctx.moveTo(size - cs, 0); ctx.lineTo(size, 0); ctx.lineTo(size, cs);
+    ctx.closePath(); ctx.fill();
+
+    // 横线
+    ctx.strokeStyle = '#c8b97a';
+    ctx.lineWidth = size * 0.022;
+    ctx.setLineDash([size * 0.045, size * 0.03]);
+    for (let i = 0; i < 3; i++) {
+      const y = size * 0.38 + i * size * 0.15;
+      ctx.beginPath(); ctx.moveTo(size * 0.16, y); ctx.lineTo(size * 0.72, y); ctx.stroke();
+    }
+
+    // 📝 emoji
+    ctx.setLineDash([]);
+    ctx.font = `${Math.round(size * 0.38)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('📝', size * 0.5, size * 0.62);
+
+    return c.toDataURL('image/png');
+  }
+
+  try {
+    const manifest = {
+      name: '慢慢贴', short_name: '慢慢贴',
+      description: 'ADHD友好型情绪陪伴与任务管理工具',
+      start_url: './', display: 'standalone',
+      background_color: '#FFF9C4', theme_color: '#FFF9C4',
+      orientation: 'portrait-primary',
+      icons: [
+        { src: drawIcon(192), sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: drawIcon(512), sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+        { src: 'icon.svg',    sizes: 'any',     type: 'image/svg+xml' },
+      ],
+    };
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(blob);
+  } catch (e) { /* 静默失败，继续使用静态 manifest.json */ }
+}
+
+// file:// 协议提示
+function checkProtocol() {
+  if (location.protocol !== 'file:') return;
+  const banner = document.createElement('div');
+  banner.style.cssText = `
+    position:fixed;bottom:0;left:0;right:0;
+    background:#5d4037;color:#fff9c4;
+    font-family:'Press Start 2P',monospace;font-size:8px;
+    padding:10px 14px;line-height:2;z-index:9999;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    flex-wrap:wrap;
+  `;
+  banner.innerHTML = `
+    <span>⚠️ PWA需要HTTP服务才能安装。<br>运行 serve.bat 后用 <b>localhost:8000</b> 打开</span>
+    <button onclick="this.parentElement.remove()" style="
+      font-family:'Press Start 2P',monospace;font-size:7px;
+      background:#ffe082;color:#5d4037;border:none;border-radius:4px;
+      padding:4px 8px;cursor:pointer;">知道了</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  pwaBanner.classList.add('show');
+});
+pwaInstallBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  pwaBanner.classList.remove('show');
+});
+pwaDismissBtn.addEventListener('click', () => pwaBanner.classList.remove('show'));
+window.addEventListener('appinstalled', () => {
+  pwaBanner.classList.remove('show');
+  showBubble('已添加到桌面，下次直接从桌面打开就好。', 3500);
+});
+
+// 注册 Service Worker（仅 HTTP/HTTPS）
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('[SW] 注册成功，scope:', reg.scope))
+      .catch(err => console.warn('[SW] 注册失败:', err));
+  });
+}
+
+// 入口
+buildPWAManifest();
+checkProtocol();
+
+// ============================================================
+//  拖拽（桌面）
+// ============================================================
+let isDragging = false;
+let dragOffsetX = 0, dragOffsetY = 0;
+
+sticky.addEventListener('mousedown', (e) => {
+  // 不在输入框、按钮、复选框上拖拽
+  if (['INPUT','BUTTON','TEXTAREA'].includes(e.target.tagName)) return;
+  isDragging = true;
+  dragOffsetX = e.clientX - sticky.getBoundingClientRect().left;
+  dragOffsetY = e.clientY - sticky.getBoundingClientRect().top;
+  sticky.classList.add('dragging');
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  let x = e.clientX - dragOffsetX;
+  let y = e.clientY - dragOffsetY;
+  x = Math.max(0, Math.min(window.innerWidth  - sticky.offsetWidth,  x));
+  y = Math.max(0, Math.min(window.innerHeight - sticky.offsetHeight, y));
+  sticky.style.left = x + 'px';
+  sticky.style.top  = y + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false;
+  sticky.classList.remove('dragging');
+  LS.set('sl_pos', { x: parseInt(sticky.style.left), y: parseInt(sticky.style.top) });
+});
+
+// ============================================================
+//  触摸拖拽（手机）—— 简单实现
+// ============================================================
+let touchOffX = 0, touchOffY = 0;
+sticky.addEventListener('touchstart', (e) => {
+  if (['INPUT','BUTTON'].includes(e.target.tagName)) return;
+  const t = e.touches[0];
+  touchOffX = t.clientX - sticky.getBoundingClientRect().left;
+  touchOffY = t.clientY - sticky.getBoundingClientRect().top;
+}, { passive: true });
+
+sticky.addEventListener('touchmove', (e) => {
+  const t = e.touches[0];
+  let x = t.clientX - touchOffX;
+  let y = t.clientY - touchOffY;
+  x = Math.max(0, Math.min(window.innerWidth  - sticky.offsetWidth,  x));
+  y = Math.max(0, Math.min(window.innerHeight - sticky.offsetHeight, y));
+  sticky.style.left = x + 'px';
+  sticky.style.top  = y + 'px';
+  e.preventDefault();
+}, { passive: false });
+
+sticky.addEventListener('touchend', () => {
+  LS.set('sl_pos', { x: parseInt(sticky.style.left), y: parseInt(sticky.style.top) });
+});
+
+// ============================================================
+//  恢复位置
+// ============================================================
+function restorePosition() {
+  // 手机不做位置恢复
+  if (window.innerWidth <= 480) return;
+  const pos = LS.get('sl_pos', null);
+  if (pos) {
+    sticky.style.left = Math.min(pos.x, window.innerWidth  - sticky.offsetWidth)  + 'px';
+    sticky.style.top  = Math.min(pos.y, window.innerHeight - sticky.offsetHeight) + 'px';
+  } else {
+    // 默认居中偏左
+    sticky.style.left = Math.max(0, (window.innerWidth  / 2 - 170)) + 'px';
+    sticky.style.top  = Math.max(0, (window.innerHeight / 2 - 250)) + 'px';
+  }
+}
+
+// ============================================================
+//  初始化
+// ============================================================
+function init() {
+  restorePosition();
+  applyColor(stickyColor);  // 恢复便利贴颜色
+  renderEggs();
+  renderPet();
+  renderTasks();
+  checkYesterday();          // 检查昨日未完成任务
+}
+
+init();
+</script>
+</body>
+</html>
