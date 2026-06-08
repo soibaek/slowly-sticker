@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>桌宠助手 · 慢慢贴</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  /* ============ 全局 ============ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink:#2b2118;          /* 深褐面板底 */
+    --ink2:#3a2d1e;
+    --gold:#c9a227;         /* 金边 */
+    --gold-lite:#e8d9a0;    /* 面板内文字 */
+    --cream:#fff3c4;        /* 米黄徽章 */
+    --brown:#5d4037;
+    --paper:#e9e2c4;        /* 背景纸色 */
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Press Start 2P', monospace;
+    color: var(--brown);
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(rgba(110,95,55,0.10) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(110,95,55,0.10) 1px, transparent 1px);
+    background-size: 16px 16px;            /* 8x8 像素网格的视觉密度 */
+    image-rendering: pixelated;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+  }
+  #stage { position: fixed; inset: 0; }
+
+  /* ============ 通用像素面板 ============ */
+  .panel {
+    background: var(--ink);
+    border: 3px solid var(--gold);
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.35);
+    color: var(--gold-lite);
+    image-rendering: pixelated;
+  }
+  .panel-title {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--gold-lite);
+  }
+
+  /* ============ 左上：标题条 ============ */
+  #titlebar {
+    position: absolute; top: 14px; left: 14px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    z-index: 30;
+  }
+  #titlebar h1 { font-size: 13px; color: var(--gold-lite); letter-spacing: 2px; }
+  #titlebar .ver { font-size: 9px; color: #b98e3a; }
+
+  /* 在线 / 专注 徽章 */
+  #badges {
+    position: absolute; top: 62px; left: 14px;
+    display: flex; gap: 8px; z-index: 30;
+  }
+  .badge {
+    font-size: 9px; padding: 9px 12px;
+    border: 3px solid var(--gold);
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .badge.online { background: var(--cream); color: #6d4c00; }
+  .badge.focus  { background: #c8e6c9; color: #1b5e20; border-color: #2e7d32; }
+
+  /* 介绍面板 */
+  #intro {
+    position: absolute; top: 104px; left: 14px;
+    width: 200px; padding: 10px 12px; z-index: 25;
+  }
+  #intro .hd { font-size: 8px; color:#b98e3a; margin-bottom: 8px; padding-bottom:6px;
+    border-bottom: 2px dashed #5b4a28; }
+  #intro .row { display:flex; align-items:center; gap:8px; padding: 5px 0; font-size: 8px; }
+  #intro .row .ic { font-size: 13px; width: 16px; text-align:center; }
+  #intro .row .nm { color: var(--gold-lite); }
+  #intro .row .ds { color: #8a7340; font-size: 7px; margin-left: 2px; }
+
+  /* ============ 右上：状态提示 ============ */
+  #state-tag {
+    position: absolute; top: 14px; right: 14px;
+    font-size: 8px; padding: 9px 12px; z-index: 30;
+    display:flex; align-items:center; gap:6px;
+  }
+  #state-tag .dot { color:#e53935; }
+
+  /* ============ 左下：提醒清单 ============ */
+  #reminders {
+    position: absolute; left: 14px; bottom: 70px;
+    width: 220px; padding: 10px 12px; z-index: 25;
+  }
+  #reminders .hd { font-size: 8px; color:#b98e3a; margin-bottom: 8px; padding-bottom:6px;
+    border-bottom: 2px dashed #5b4a28; }
+  #reminders .ritem {
+    display:flex; align-items:center; gap:7px; padding: 5px 2px;
+    font-size: 7px; color:#8a7340; line-height: 1.6;
+  }
+  #reminders .ritem.active { color: var(--gold-lite); }
+  #reminders .ritem .box {
+    width: 9px; height: 9px; flex-shrink:0;
+    border:2px solid #6b5630; background: var(--ink2);
+  }
+  #reminders .ritem.active .box { background: var(--gold); }
+
+  /* ============ 右下：状态地图 ============ */
+  #map {
+    position: absolute; right: 14px; bottom: 70px;
+    width: 190px; padding: 10px 12px; z-index: 25;
+  }
+  #map .hd { font-size: 8px; color:#b98e3a; margin-bottom: 8px; }
+  #map .grid {
+    position: relative; height: 110px;
+    background:
+      linear-gradient(rgba(201,162,39,0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(201,162,39,0.12) 1px, transparent 1px);
+    background-size: 18px 18px;
+    border: 2px solid #5b4a28;
+  }
+  #map .node { position:absolute; width:8px; height:8px; background:#7a6322;
+    transform: translate(-50%,-50%); }
+  #map .node.cur { width:14px; height:14px; background:var(--gold);
+    box-shadow:0 0 0 2px var(--ink), 0 0 0 4px #7a6322; }
+  #map svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #map .legend { font-size:6px; color:#8a7340; margin-top:6px; }
+
+  /* ============ 桌宠本体（无边框） ============ */
+  .pet {
+    position: absolute; width: 64px; height: 64px;
+    cursor: grab; z-index: 50;
+    image-rendering: pixelated;
+    transition: transform .15s steps(3);
+  }
+  .pet img { width:100%; height:100%; object-fit: contain; image-rendering: pixelated;
+    display:block; pointer-events:none;
+    filter: drop-shadow(2px 3px 0 rgba(60,40,20,0.25)); }
+  .pet .label {
+    position:absolute; left:50%; bottom:-16px; transform:translateX(-50%);
+    font-size:7px; color:#6d4c41; background:rgba(255,243,196,.7);
+    padding:1px 4px; white-space:nowrap;
+  }
+  .pet.dragging { cursor: grabbing; z-index: 80; }
+  .pet.facing-left img { transform: scaleX(-1); }
+
+  /* 动作状态 */
+  @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+  @keyframes waddle { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(4deg)} }
+  @keyframes spin360 { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+  @keyframes happy { 0%,100%{transform:translateY(0) scale(1)} 30%{transform:translateY(-10px) scale(1.08)} 60%{transform:translateY(0) scale(.96)} }
+  .pet.idle  img { animation: floaty 2.4s ease-in-out infinite; }
+  .pet.walk  img { animation: waddle .35s steps(2) infinite; }
+  .pet.spin  img { animation: spin360 .7s steps(12) 1; }
+  .pet.happy img { animation: happy .5s ease infinite; }
+  .pet.sleep img { transform: rotate(8deg) scale(.92); filter: drop-shadow(2px 3px 0 rgba(60,40,20,0.25)) grayscale(.15); }
+
+  /* 睡觉 zzz */
+  .zzz { position:absolute; top:-14px; right:-6px; font-size:10px; color:#5d4037;
+    animation: floaty 1.6s ease-in-out infinite; }
+
+  /* 幽灵占位（暗示可自由移动） */
+  .ghost {
+    position:absolute; width:72px; height:72px; z-index:5;
+    border:2px dashed #b5a86f; opacity:.5;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ghost img { width:54px; height:54px; object-fit:contain; image-rendering:pixelated;
+    opacity:.35; filter: grayscale(1); }
+  .ghost .gl { position:absolute; bottom:-15px; left:50%; transform:translateX(-50%);
+    font-size:7px; color:#9c8d5a; background:rgba(0,0,0,.06); padding:1px 5px; }
+
+  /* ============ 气泡对话框 ============ */
+  .bubble {
+    position:absolute; z-index:70; max-width:230px; min-width:150px;
+    background:#fff8df; border:3px solid var(--brown);
+    box-shadow:4px 4px 0 rgba(60,40,20,.3);
+    padding:10px 12px; font-size:8px; color:#4e342e; line-height:1.9;
+  }
+  .bubble .tag {
+    position:absolute; top:-3px; right:-3px; font-size:6px;
+    background:#9575cd; color:#fff; padding:2px 5px; border:2px solid var(--brown);
+  }
+  .bubble::after {
+    content:''; position:absolute; bottom:-10px; left:28px;
+    border:5px solid transparent; border-top-color:var(--brown);
+  }
+  .bubble .api {
+    margin-top:6px; padding-top:6px; border-top:2px dashed #d8c89a;
+    font-size:6px; color:#a98c4a;
+  }
+  .bubble .emoji { font-size: 11px; }
+
+  /* ============ 互动菜单 ============ */
+  .menu {
+    position:absolute; z-index:75; width:130px; padding:8px;
+    background:var(--ink); border:3px solid var(--gold);
+    box-shadow:4px 4px 0 rgba(0,0,0,.35);
+  }
+  .menu .mh { font-size:7px; color:#b98e3a; padding:2px 2px 8px; }
+  .menu .mi {
+    display:flex; align-items:center; gap:8px; padding:9px 8px;
+    font-size:9px; color:var(--gold-lite); cursor:pointer;
+    border:2px solid #5b4a28; margin-bottom:6px; background:var(--ink2);
+    transition: all .08s;
+  }
+  .menu .mi:last-child { margin-bottom:0; }
+  .menu .mi:hover { background:#4a3a22; transform: translate(1px,1px); }
+  .menu .mi .mic { font-size:13px; width:16px; text-align:center; }
+  .menu.sub { width:120px; }
+  .menu.sub .mi { border-color:#3b6ea5; }
+  .menu.sub .mi.comfort { border-color:#b9852e; }
+
+  /* ============ 聊天/安慰 模态 ============ */
+  .chatwin {
+    position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+    width:min(380px,92vw); z-index:120;
+    background:var(--ink); border:3px solid var(--gold);
+    box-shadow:6px 6px 0 rgba(0,0,0,.4); display:none;
+  }
+  .chatwin.show { display:block; }
+  .chatwin .cw-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:9px 12px; font-size:9px; color:var(--gold-lite);
+    border-bottom:2px solid #5b4a28;
+  }
+  .chatwin .cw-head .x { cursor:pointer; color:#c9a227; font-size:12px; }
+  .chatwin .cw-body { padding:14px; }
+  .chatwin .cw-reply {
+    background:#fff8df; border:2px solid #d8c89a; color:#4e342e;
+    padding:12px; font-size:9px; line-height:2; position:relative;
+  }
+  .chatwin .cw-reply .tag { position:absolute; top:-3px; right:-3px; font-size:6px;
+    background:#9575cd; color:#fff; padding:2px 5px; border:2px solid var(--brown); }
+  .chatwin .cw-reply .api { margin-top:8px; padding-top:8px; border-top:2px dashed #d8c89a;
+    font-size:7px; color:#a98c4a; }
+  .chatwin .cw-input { display:flex; gap:8px; padding:12px; border-top:2px solid #5b4a28; }
+  .chatwin .cw-input input {
+    flex:1; font-family:inherit; font-size:8px; padding:9px;
+    background:#1c150d; border:2px solid #5b4a28; color:#e8d9a0; outline:none;
+  }
+  .chatwin .cw-input input:focus { border-color:var(--gold); }
+  .chatwin .cw-note { font-size:6px; color:#8a7340; padding:0 12px 10px; }
+
+  /* ============ 底部工具栏 ============ */
+  #toolbar {
+    position:fixed; left:0; right:0; bottom:0; height:58px; z-index:100;
+    background:var(--ink); border-top:3px solid var(--gold);
+    display:flex; align-items:center; gap:14px; padding:0 14px;
+  }
+  #pet-picker { display:flex; align-items:center; gap:6px; }
+  #pet-picker .pp-label { font-size:7px; color:#8a7340; margin-right:2px; }
+  .pp-cell {
+    width:38px; height:38px; border:2px solid #5b4a28; background:#1c150d;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    image-rendering:pixelated; transition:transform .08s;
+  }
+  .pp-cell img { width:30px; height:30px; object-fit:contain; image-rendering:pixelated; }
+  .pp-cell:hover { transform:translateY(-2px); }
+  .pp-cell.active { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); background:#3a2d1e; }
+
+  #tools-center { display:flex; gap:10px; margin-left:auto; margin-right:auto; }
+  .tbtn {
+    font-family:inherit; font-size:9px; cursor:pointer;
+    padding:10px 14px; border:3px solid; color:#fff;
+    box-shadow:3px 3px 0 rgba(0,0,0,.35); display:flex; align-items:center; gap:6px;
+    transition: all .08s;
+  }
+  .tbtn:active { box-shadow:none; transform:translate(3px,3px); }
+  .tbtn.orange { background:#e8920c; border-color:#a5660a; }
+  .tbtn.green  { background:#2e7d32; border-color:#1b5e20; }
+  .tbtn.purple { background:#9575cd; border-color:#5e35b1; }
+  .tbtn.brown  { background:#5d4037; border-color:#3e2723; }
+
+  #help-btn {
+    width:34px; height:34px; border:3px solid var(--gold); background:var(--ink2);
+    color:var(--gold-lite); font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #help-btn:hover { background:#4a3a22; }
+
+  /* ============ 玩具动画 ============ */
+  .toy { position:absolute; z-index:60; font-size:30px; image-rendering:pixelated;
+    pointer-events:none; }
+  @keyframes teaser { 0%,100%{transform:rotate(-25deg)} 50%{transform:rotate(25deg)} }
+  @keyframes frisbee { 0%{transform:translate(0,0) rotate(0)} 100%{transform:translate(120px,-30px) rotate(720deg)} }
+  @keyframes rollball { 0%{transform:translateX(0) rotate(0)} 100%{transform:translateX(90px) rotate(720deg)} }
+  @keyframes bounceball { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-40px)} }
+  @keyframes wheelspin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+  @keyframes climbup { 0%{transform:translateY(0)} 100%{transform:translateY(-50px)} }
+  .toy.cat-teaser { animation: teaser 1s ease-in-out infinite; transform-origin: top center; }
+  .toy.dog-frisbee { animation: frisbee 1.2s ease-out infinite; }
+  .toy.rabbit-ball { animation: rollball 1.4s linear infinite; }
+  .toy.fox-ball { animation: bounceball .7s ease-in-out infinite; }
+  .toy.hamster-wheel { animation: wheelspin 1s linear infinite; }
+  .toy.snake-branch { animation: climbup 1.4s ease-in-out infinite alternate; }
+  .toy.bear-ball { animation: rollball 1.6s linear infinite; }
+
+  /* ============ 帮助模态 ============ */
+  #help-modal {
+    position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200;
+    display:none; align-items:center; justify-content:center;
+  }
+  #help-modal.show { display:flex; }
+  #help-box {
+    width:min(440px,92vw); max-height:82vh; overflow-y:auto;
+    background:var(--ink); border:3px solid var(--gold);
+    box-shadow:6px 6px 0 rgba(0,0,0,.4); padding:20px; color:var(--gold-lite);
+  }
+  #help-box h2 { font-size:12px; margin-bottom:14px; color:var(--gold-lite); }
+  #help-box p, #help-box li { font-size:8px; line-height:2.1; color:#cdbd86; }
+  #help-box ol { padding-left:18px; margin:8px 0; }
+  #help-box .close {
+    margin-top:14px; font-family:inherit; font-size:8px; cursor:pointer;
+    padding:9px 14px; background:var(--gold); color:var(--ink); border:none;
+    box-shadow:3px 3px 0 rgba(0,0,0,.3);
+  }
+  #help-box .close:active { box-shadow:none; transform:translate(3px,3px); }
+
+  /* 手型光标（摸摸模式） */
+  body.petting, body.petting * { cursor: grab; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 左上：标题 -->
+  <div id="titlebar" class="panel">
+    <span style="font-size:14px">🐾</span>
+    <h1>桌宠助手</h1>
+    <span class="ver">| ♡ 2.0</span>
+  </div>
+
+  <!-- 在线/专注徽章 -->
+  <div id="badges">
+    <div class="badge online">🕐 在线 <span id="online-time">00:00</span></div>
+    <div class="badge focus">⏱ <span id="focus-min">0</span>分钟</div>
+  </div>
+
+  <!-- 介绍面板 -->
+  <div id="intro" class="panel">
+    <div class="hd">▸ 桌宠小助手介绍</div>
+    <div class="row"><span class="ic">💬</span><span class="nm">陪我聊聊</span><span class="ds">· 随便聊 / 安慰</span></div>
+    <div class="row"><span class="ic">🎮</span><span class="nm">一起玩</span><span class="ds">· 各式玩具</span></div>
+    <div class="row"><span class="ic">✋</span><span class="nm">摸 摸</span><span class="ds">· 开心转圈</span></div>
+    <div class="row"><span class="ic">😴</span><span class="nm">去睡觉</span><span class="ds">· 蜷起入睡</span></div>
+  </div>
+
+  <!-- 右上：状态提示 -->
+  <div id="state-tag" class="panel">
+    <span class="dot">❗</span><span id="state-text">右下角 · 站立</span>
+  </div>
+
+  <!-- 左下：提醒清单 -->
+  <div id="reminders" class="panel">
+    <div class="hd">● 提醒清单</div>
+    <div id="rlist"></div>
+  </div>
+
+  <!-- 右下：状态地图 -->
+  <div id="map" class="panel">
+    <div class="hd">⬚ 状态地图</div>
+    <div class="grid" id="map-grid">
+      <svg id="map-lines"></svg>
+    </div>
+    <div class="legend">● 当前位置　· 历史足迹</div>
+  </div>
+
+  <!-- 桌宠本体（JS 注入） -->
+
+  <!-- 底部工具栏 -->
+  <div id="toolbar">
+    <div id="pet-picker">
+      <span class="pp-label">换宠物</span>
+    </div>
+    <div id="tools-center">
+      <button class="tbtn orange" id="btn-random">🎲 新安置</button>
+      <button class="tbtn green"  id="btn-roam">🐾 自动巡游</button>
+      <button class="tbtn purple" id="btn-bubble">💬 隐藏气泡</button>
+      <button class="tbtn brown"  id="btn-back">📝 慢慢贴</button>
+    </div>
+    <button id="help-btn" title="使用说明">?</button>
+  </div>
+
+  <!-- 帮助模态 -->
+  <div id="help-modal">
+    <div id="help-box">
+      <h2>🐾 桌宠助手 · 使用说明</h2>
+      <p>这是一个像素风桌面小动物原型。小动物没有任何外框，可以自由移动。</p>
+      <ol>
+        <li><b>拖拽</b>：按住小动物拖动，松手即放置到新位置。</li>
+        <li><b>点击</b>：单击小动物，旁边弹出互动菜单（4 个选项）。</li>
+        <li><b>陪我聊聊</b>：展开「随便聊聊 / 安慰我一下」，底部出现输入框（接入 AI API 处已注明）。</li>
+        <li><b>一起玩</b>：根据当前动物弹出对应玩具动画（猫=逗猫棒、狗=飞盘、兔=草球…）。</li>
+        <li><b>摸摸</b>：光标变手型，小动物转圈圈 360°。</li>
+        <li><b>去睡觉</b>：小动物蜷缩入睡、停止移动；再次点击唤醒。</li>
+        <li><b>🎲 新安置</b>：随机移动到屏幕某处（左上 / 中央 / 右下…）。</li>
+        <li><b>🐾 自动巡游</b>：开启后小动物自动缓慢漫步。</li>
+        <li><b>底部缩略图</b>：切换不同动物（玩具会随之变化）。</li>
+      </ol>
+      <p style="color:#a98c4a">气泡里的「此处接入 AI API」表示：实际对话回复需要在此调用大模型接口。</p>
+      <button class="close" id="help-close">知道了</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+//  数据
+// ============================================================
+const ANIMALS = [
+  { key:'cat',      name:'像素猫',  img:'assets/pets/cat.png',      toy:{cls:'cat-teaser',  e:'🪶', label:'逗猫棒'} },
+  { key:'dog',      name:'像素狗',  img:'assets/pets/dog.png',      toy:{cls:'dog-frisbee', e:'🥏', label:'飞盘'} },
+  { key:'rabbit',   name:'像素兔',  img:'assets/pets/rabbit.png',   toy:{cls:'rabbit-ball', e:'🟢', label:'草球'} },
+  { key:'fox',      name:'像素狐',  img:'assets/pets/fox.png',      toy:{cls:'fox-ball',    e:'⚽', label:'玩具球'} },
+  { key:'hamster',  name:'仓鼠球',  img:'assets/pets/hamster.png',  toy:{cls:'hamster-wheel',e:'⚙️', label:'跑轮'} },
+  { key:'snake',    name:'小蛇蛇',  img:'assets/pets/snake.png',    toy:{cls:'snake-branch',e:'🌿', label:'攀爬架'} },
+  { key:'bear',     name:'小熊熊',  img:'assets/pets/bear.png',     toy:{cls:'bear-ball',   e:'🔴', label:'大球'} },
+  { key:'redpanda', name:'小浣熊',  img:'assets/pets/redpanda.png', toy:{cls:'fox-ball',    e:'⚽', label:'玩具球'} },
+];
+
+const CHITCHAT = [
+  '喵～你今天过得怎么样？',
+  '我在你旁边待着，不打扰你哦。',
+  '要不要一起发会儿呆？',
+  '今天也辛苦啦，记得喝水～',
+];
+const COMFORT = [
+  '给你一颗糖 🍬 今天真的辛苦了！',
+  '没关系的，慢慢来，我陪着你。',
+  '做不到也没关系，你已经很棒了。',
+  '抱抱你，坏情绪会过去的。',
+];
+const REMINDERS = [
+  { t:'坐了 45 分钟了～', active:true },
+  { t:'起来喝一杯水 💧', active:false },
+  { t:'看看远处放松眼睛', active:false },
+  { t:'伸个懒腰一分钟', active:false },
+  { t:'深呼吸三次 🌬️', active:false },
+  { t:'记得保存进度 💾', active:false },
+  { t:'小事完成也要夸自己', active:false },
+];
+
+// ============================================================
+//  状态
+// ============================================================
+let curAnimal = ANIMALS[0];
+let isSleeping = false;
+let isRoaming = false;
+let bubbleHidden = false;
+let roamTimer = null;
+const visited = [];        // 地图足迹 {x,y}
+
+const stage = document.getElementById('stage');
+
+// ============================================================
+//  创建桌宠
+// ============================================================
+const pet = document.createElement('div');
+pet.className = 'pet idle';
+pet.innerHTML = `<img src="${curAnimal.img}" alt="${curAnimal.name}">
+  <span class="label">${curAnimal.name}</span>`;
+stage.appendChild(pet);
+// 初始位置（右下角，呼应截图）
+placePet(window.innerWidth - 260, window.innerHeight - 240, true);
+
+function setPetImg() {
+  pet.querySelector('img').src = curAnimal.img;
+  pet.querySelector('.label').textContent = curAnimal.name;
+}
+
+// ============================================================
+//  幽灵占位（暗示自由移动）：左上、中央、右上
+// ============================================================
+const GHOSTS = [
+  { x: 60,  y: 360 },
+  { x: window.innerWidth/2 - 36, y: window.innerHeight/2 - 60 },
+  { x: window.innerWidth - 220, y: 60 },
+];
+GHOSTS.forEach(g => {
+  const el = document.createElement('div');
+  el.className = 'ghost';
+  el.style.left = g.x + 'px';
+  el.style.top  = g.y + 'px';
+  el.innerHTML = `<img src="${curAnimal.img}"><span class="gl">像素猫</span>`;
+  el.dataset.ghost = '1';
+  stage.appendChild(el);
+});
+function refreshGhosts(){
+  document.querySelectorAll('.ghost img').forEach(i => i.src = curAnimal.img);
+  document.querySelectorAll('.ghost .gl').forEach(i => i.textContent = curAnimal.name);
+}
+
+// ============================================================
+//  放置 / 移动
+// ============================================================
+function placePet(x, y, instant) {
+  x = Math.max(8, Math.min(window.innerWidth - 72, x));
+  y = Math.max(70, Math.min(window.innerHeight - 130, y));
+  if (instant) pet.style.transition = 'none';
+  else pet.style.transition = 'left .9s steps(18), top .9s steps(18)';
+  // 朝向
+  const cur = parseFloat(pet.style.left || 0);
+  pet.classList.toggle('facing-left', x < cur);
+  pet.style.left = x + 'px';
+  pet.style.top  = y + 'px';
+  if (instant) requestAnimationFrame(()=> pet.style.transition = 'left .9s steps(18), top .9s steps(18)');
+  markVisited(x, y);
+  updateStateTag(x, y);
+}
+
+function randomPlace() {
+  if (isSleeping) { wake(); }
+  const x = 40 + Math.random() * (window.innerWidth - 200);
+  const y = 110 + Math.random() * (window.innerHeight - 260);
+  setState('walk');
+  placePet(x, y);
+  setTimeout(()=> setState('idle'), 950);
+}
+
+// ============================================================
+//  状态切换
+// ============================================================
+function setState(s) {
+  if (isSleeping && s !== 'sleep') return;
+  pet.classList.remove('idle','walk','spin','happy','sleep');
+  pet.classList.add(s);
+}
+
+function updateStateTag(x, y) {
+  const W = window.innerWidth, H = window.innerHeight;
+  let zone = (y < H/2 ? '上' : '下') + (x < W/2 ? '左' : '右');
+  const map = {'上左':'左上角','上右':'右上角','下左':'左下角','下右':'右下角'};
+  let act = isSleeping ? '睡觉中' : (isRoaming ? '巡游中' : '站立');
+  document.getElementById('state-text').textContent = `${map[zone]} · ${act}`;
+}
+
+// ============================================================
+//  拖拽
+// ============================================================
+let dragging = false, dx = 0, dy = 0, moved = false;
+pet.addEventListener('mousedown', (e) => {
+  dragging = true; moved = false;
+  pet.classList.add('dragging');
+  const r = pet.getBoundingClientRect();
+  dx = e.clientX - r.left; dy = e.clientY - r.top;
+  e.preventDefault();
+});
+document.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  moved = true;
+  pet.style.transition = 'none';
+  placePet(e.clientX - dx, e.clientY - dy, true);
+});
+document.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  pet.classList.remove('dragging');
+});
+
+// 触摸拖拽
+pet.addEventListener('touchstart', (e) => {
+  dragging = true; moved = false;
+  const t = e.touches[0]; const r = pet.getBoundingClientRect();
+  dx = t.clientX - r.left; dy = t.clientY - r.top;
+}, {passive:true});
+document.addEventListener('touchmove', (e) => {
+  if (!dragging) return; moved = true;
+  const t = e.touches[0];
+  pet.style.transition='none';
+  placePet(t.clientX - dx, t.clientY - dy, true);
+}, {passive:true});
+document.addEventListener('touchend', () => { dragging = false; });
+
+// ============================================================
+//  点击桌宠 → 菜单 / 唤醒
+// ============================================================
+pet.addEventListener('click', (e) => {
+  if (moved) { moved = false; return; }       // 拖拽不算点击
+  if (isSleeping) { wake(); return; }
+  if (document.body.classList.contains('petting')) { doPet(); return; }
+  openMenu();
+});
+
+// ============================================================
+//  互动菜单
+// ============================================================
+let menuEl = null;
+function clearPopups() {
+  document.querySelectorAll('.menu,.bubble').forEach(n => n.remove());
+  menuEl = null;
+}
+function petPos() {
+  return { x: parseFloat(pet.style.left), y: parseFloat(pet.style.top) };
+}
+function openMenu() {
+  clearPopups();
+  const p = petPos();
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  let mx = p.x + 74, my = p.y - 20;
+  if (mx + 130 > window.innerWidth) mx = p.x - 138;
+  if (my + 200 > window.innerHeight) my = window.innerHeight - 210;
+  menuEl.style.left = Math.max(8,mx) + 'px';
+  menuEl.style.top  = Math.max(70,my) + 'px';
+  menuEl.innerHTML = `
+    <div class="mh">选择互动 ▾</div>
+    <div class="mi" data-act="chat"><span class="mic">💬</span>陪我聊聊</div>
+    <div class="mi" data-act="play"><span class="mic">🎮</span>一起玩</div>
+    <div class="mi" data-act="pet"><span class="mic">✋</span>摸摸</div>
+    <div class="mi" data-act="sleep"><span class="mic">😴</span>去睡觉</div>`;
+  stage.appendChild(menuEl);
+  menuEl.querySelectorAll('.mi').forEach(mi => {
+    mi.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const act = mi.dataset.act;
+      if (act === 'chat')  openChatSub();
+      if (act === 'play')  startPlay();
+      if (act === 'pet')   enterPetting();
+      if (act === 'sleep') sleep();
+    });
+  });
+}
+
+// 子菜单：随便聊 / 安慰
+function openChatSub() {
+  clearPopups();
+  const p = petPos();
+  const m = document.createElement('div');
+  m.className = 'menu sub';
+  let mx = p.x + 74; if (mx + 120 > window.innerWidth) mx = p.x - 128;
+  m.style.left = Math.max(8,mx) + 'px';
+  m.style.top  = Math.max(70, p.y - 10) + 'px';
+  m.innerHTML = `
+    <div class="mh">陪我聊聊 ▾</div>
+    <div class="mi" data-c="chat"><span class="mic">💭</span>随便聊聊</div>
+    <div class="mi comfort" data-c="comfort"><span class="mic">🤗</span>安慰我一下</div>`;
+  stage.appendChild(m);
+  m.querySelectorAll('.mi').forEach(mi => mi.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    clearPopups();
+    if (mi.dataset.c === 'chat') openChatWin('chat');
+    else openChatWin('comfort');
+  }));
+}
+
+// ============================================================
+//  气泡 + 聊天窗
+// ============================================================
+function showBubble(text, emoji, comfort) {
+  if (bubbleHidden) return;
+  document.querySelectorAll('.bubble').forEach(n=>n.remove());
+  const p = petPos();
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  b.style.left = Math.max(8, p.x - 30) + 'px';
+  b.style.top  = Math.max(70, p.y - 78) + 'px';
+  b.innerHTML = `${comfort?'<span class="tag">安慰</span>':'<span class="tag" style="background:#3b6ea5">闲聊</span>'}
+    <span class="emoji">${emoji||'🐾'}</span> ${text}
+    <div class="api">※ 此处接入 AI API</div>`;
+  stage.appendChild(b);
+}
+
+const chatWin = document.createElement('div');
+chatWin.className = 'chatwin';
+document.body.appendChild(chatWin);
+function openChatWin(mode) {
+  const comfort = mode === 'comfort';
+  const pool = comfort ? COMFORT : CHITCHAT;
+  const reply = pool[Math.floor(Math.random()*pool.length)];
+  setState('happy');
+  showBubble(reply, comfort?'🍬':'💬', comfort);
+  chatWin.innerHTML = `
+    <div class="cw-head">
+      <span>${comfort?'🤗 安慰模式':'💬 闲聊模式'} · ${curAnimal.name}</span>
+      <span class="x" id="cw-x">✕</span>
+    </div>
+    <div class="cw-body">
+      <div class="cw-reply">
+        <span class="tag" style="${comfort?'':'background:#3b6ea5'}">${comfort?'安慰':'闲聊'}</span>
+        ${reply}
+        <div class="api">※ 此处接入 AI API</div>
+      </div>
+    </div>
+    <div class="cw-input">
+      <input id="cw-text" placeholder="跟我说说吧…">
+      <button class="tbtn orange" id="cw-send">发送</button>
+    </div>
+    <div class="cw-note">※ 文本输入为静态演示 — 需接入 LLM 接口</div>`;
+  chatWin.classList.add('show');
+  document.getElementById('cw-x').onclick = () => { chatWin.classList.remove('show'); setState('idle'); };
+  document.getElementById('cw-send').onclick = () => {
+    const v = document.getElementById('cw-text').value.trim();
+    const r = pool[Math.floor(Math.random()*pool.length)];
+    showBubble(v ? (comfort?'我听到了，'+r:'嗯嗯～'+r) : r, comfort?'🍬':'💬', comfort);
+    document.getElementById('cw-text').value = '';
+  };
+}
+
+// ============================================================
+//  玩 / 摸 / 睡
+// ============================================================
+function startPlay() {
+  clearPopups();
+  document.querySelectorAll('.toy').forEach(n=>n.remove());
+  setState('happy');
+  const p = petPos();
+  const toy = document.createElement('div');
+  toy.className = 'toy ' + curAnimal.toy.cls;
+  toy.textContent = curAnimal.toy.e;
+  toy.style.left = (p.x + 60) + 'px';
+  toy.style.top  = (p.y) + 'px';
+  stage.appendChild(toy);
+  showBubble(`一起玩${curAnimal.toy.label}吧！`, curAnimal.toy.e, false);
+  setTimeout(()=> { toy.remove(); if(!isSleeping) setState('idle'); }, 4200);
+}
+
+function enterPetting() {
+  clearPopups();
+  document.body.classList.add('petting');
+  showBubble('点我一下，我转个圈圈～', '✋', false);
+}
+function doPet() {
+  document.body.classList.remove('petting');
+  setState('spin');
+  showBubble('嘿嘿，好开心！', '💕', false);
+  setTimeout(()=> { if(!isSleeping) setState('idle'); }, 720);
+}
+
+function sleep() {
+  clearPopups();
+  isSleeping = true;
+  if (isRoaming) toggleRoam();
+  setState('sleep');
+  const z = document.createElement('span');
+  z.className = 'zzz'; z.textContent = '💤'; z.id = 'zzz';
+  pet.appendChild(z);
+  updateStateTag(petPos().x, petPos().y);
+}
+function wake() {
+  isSleeping = false;
+  const z = document.getElementById('zzz'); if (z) z.remove();
+  setState('idle');
+  showBubble('呼啊～我醒啦！', '🌞', false);
+  updateStateTag(petPos().x, petPos().y);
+}
+
+// ============================================================
+//  自动巡游
+// ============================================================
+function toggleRoam() {
+  isRoaming = !isRoaming;
+  const btn = document.getElementById('btn-roam');
+  btn.textContent = isRoaming ? '⏸ 停止巡游' : '🐾 自动巡游';
+  if (isRoaming) {
+    if (isSleeping) wake();
+    roamTimer = setInterval(() => {
+      const x = 40 + Math.random()*(window.innerWidth-200);
+      const y = 110 + Math.random()*(window.innerHeight-260);
+      setState('walk'); placePet(x,y);
+      setTimeout(()=> { if(isRoaming && !isSleeping) setState('idle'); }, 950);
+    }, 2600);
+  } else {
+    clearInterval(roamTimer); roamTimer = null;
+  }
+  updateStateTag(petPos().x, petPos().y);
+}
+
+// ============================================================
+//  地图足迹
+// ============================================================
+function markVisited(x, y) {
+  visited.push({x, y});
+  if (visited.length > 6) visited.shift();
+  renderMap();
+}
+function renderMap() {
+  const grid = document.getElementById('map-grid');
+  grid.querySelectorAll('.node').forEach(n=>n.remove());
+  const W = window.innerWidth, H = window.innerHeight;
+  const lines = document.getElementById('map-lines');
+  let pts = [];
+  visited.forEach((v,i) => {
+    const nx = (v.x / W) * 100, ny = (v.y / H) * 100;
+    pts.push([nx, ny]);
+    const node = document.createElement('div');
+    node.className = 'node' + (i === visited.length-1 ? ' cur' : '');
+    node.style.left = nx + '%'; node.style.top = ny + '%';
+    grid.appendChild(node);
+  });
+  // 连线
+  let path = '';
+  pts.forEach((pt,i)=> path += (i?'L':'M') + pt[0] + ' ' + pt[1] + ' ');
+  lines.innerHTML = `<polyline points="${pts.map(p=>p.join(',')).join(' ')}"
+    fill="none" stroke="#7a6322" stroke-width="0.8" stroke-dasharray="2 2"
+    vector-effect="non-scaling-stroke" />`;
+  lines.setAttribute('viewBox','0 0 100 100');
+  lines.setAttribute('preserveAspectRatio','none');
+}
+
+// ============================================================
+//  提醒清单
+// ============================================================
+function renderReminders() {
+  const box = document.getElementById('rlist');
+  box.innerHTML = '';
+  REMINDERS.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'ritem' + (r.active ? ' active' : '');
+    d.innerHTML = `<span class="box"></span>${r.t}`;
+    box.appendChild(d);
+  });
+}
+
+// ============================================================
+//  宠物选择器
+// ============================================================
+function buildPicker() {
+  const wrap = document.getElementById('pet-picker');
+  ANIMALS.forEach(a => {
+    const cell = document.createElement('div');
+    cell.className = 'pp-cell' + (a.key === curAnimal.key ? ' active' : '');
+    cell.innerHTML = `<img src="${a.img}" alt="${a.name}">`;
+    cell.title = a.name;
+    cell.addEventListener('click', () => {
+      curAnimal = a;
+      setPetImg(); refreshGhosts();
+      document.querySelectorAll('.pp-cell').forEach(c=>c.classList.remove('active'));
+      cell.classList.add('active');
+      if (isSleeping) wake();
+      showBubble(`我是${a.name}，你好呀！`, '👋', false);
+    });
+    wrap.appendChild(cell);
+  });
+}
+
+// ============================================================
+//  在线计时
+// ============================================================
+let sec = 0;
+setInterval(() => {
+  sec++;
+  const m = String(Math.floor(sec/60)).padStart(2,'0');
+  const s = String(sec%60).padStart(2,'0');
+  document.getElementById('online-time').textContent = `${m}:${s}`;
+  document.getElementById('focus-min').textContent = Math.floor(sec/60);
+}, 1000);
+
+// ============================================================
+//  工具栏按钮
+// ============================================================
+document.getElementById('btn-random').onclick = () => { clearPopups(); randomPlace(); };
+document.getElementById('btn-roam').onclick   = toggleRoam;
+document.getElementById('btn-bubble').onclick = () => {
+  bubbleHidden = !bubbleHidden;
+  const b = document.getElementById('btn-bubble');
+  b.textContent = bubbleHidden ? '💬 显示气泡' : '💬 隐藏气泡';
+  if (bubbleHidden) document.querySelectorAll('.bubble').forEach(n=>n.remove());
+};
+document.getElementById('btn-back').onclick = () => { location.href = 'index.html'; };
+document.getElementById('help-btn').onclick = () => document.getElementById('help-modal').classList.add('show');
+document.getElementById('help-close').onclick = () => document.getElementById('help-modal').classList.remove('show');
+document.getElementById('help-modal').addEventListener('click', (e)=>{
+  if (e.target.id === 'help-modal') e.currentTarget.classList.remove('show');
+});
+
+// 点击空白关闭菜单/气泡
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.pet') || e.target.closest('.menu') ||
+      e.target.closest('#toolbar') || e.target.closest('.chatwin')) return;
+  clearPopups();
+});
+
+// 定时提醒气泡
+setInterval(() => {
+  if (isSleeping || bubbleHidden) return;
+  const r = REMINDERS[Math.floor(Math.random()*REMINDERS.length)];
+  showBubble(r.t, '⏰', false);
+}, 25000);
+
+// ============================================================
+//  初始化
+// ============================================================
+buildPicker();
+renderReminders();
+setTimeout(()=> showBubble('坐了 45 分钟了～起来喝杯水吧 💧', '☕', false), 800);
+window.addEventListener('resize', renderMap);
+</script>
+</body>
+</html>

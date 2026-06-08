@@ -1840,6 +1840,14 @@ function init() {
 }
 
 init();
+
+// ---- DEMO (temp) ----
+applyColor('#A8E6CF');
+tasks=[{text:'今天先喝一杯水',done:false},{text:'整理桌面文件',done:true},{text:'给朋友回一条消息',done:false}];
+eggs=7; renderEggs(); renderTasks();
+currentPet={emoji:'🐱',name:'像素猫',img:'assets/pets/cat.png'}; renderPet();
+buildColorPicker(); colorPickerPop.classList.add('show');
+
 </script>
 </body>
 </html>

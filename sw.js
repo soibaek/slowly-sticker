@@ -1,9 +1,23 @@
-const CACHE = 'manmantie-v1';
+const CACHE = 'manmantie-v3';
 const ASSETS = [
   './',
   './index.html',
+  './pet.html',
   './manifest.json',
   './icon.svg',
+  './assets/pets/cat.png',
+  './assets/pets/dog.png',
+  './assets/pets/rabbit.png',
+  './assets/pets/snake.png',
+  './assets/pets/hamster.png',
+  './assets/pets/fox.png',
+  './assets/pets/bear.png',
+  './assets/pets/redpanda.png',
+  './assets/eggs/egg_plain.png',
+  './assets/eggs/egg_rainbow.png',
+  './assets/eggs/egg_heart.png',
+  './assets/eggs/egg_blue.png',
+  './assets/eggs/egg_green.png',
   'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap',
 ];
 
