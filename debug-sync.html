@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>同步调试工具 · 慢慢贴</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background:#f5f5f5; padding:20px; }
+    .panel { background:#fff; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    h1 { color:#333; margin-bottom:20px; font-size:20px; }
+    h2 { color:#666; margin:15px 0 10px; font-size:16px; }
+    .status { padding:12px; border-radius:6px; margin:10px 0; font-family:monospace; font-size:12px; }
+    .status.success { background:#e8f5e9; color:#2e7d32; border-left:4px solid #4CAF50; }
+    .status.warning { background:#fff3e0; color:#e65100; border-left:4px solid #ff9800; }
+    .status.error { background:#ffebee; color:#c62828; border-left:4px solid #f44336; }
+    .status.info { background:#e3f2fd; color:#1565c0; border-left:4px solid #2196F3; }
+    .log { background:#1a1a1a; color:#fff; padding:15px; border-radius:6px; font-family:monospace; font-size:11px; max-height:300px; overflow-y:auto; }
+    .log-line { margin:3px 0; }
+    .log-time { color:#888; margin-right:8px; }
+    .log-success { color:#4CAF50; }
+    .log-warning { color:#ff9800; }
+    .log-error { color:#f44336; }
+    .log-info { color:#2196F3; }
+    .log-event { margin-right:8px; }
+    .test-btn {
+      padding:10px 20px; margin:5px;
+      background:#2196F3; color:white;
+      border:none; border-radius:4px;
+      cursor:pointer; font-size:13px;
+      transition:background 0.2s;
+    }
+    .test-btn:hover { background:#1976D2; }
+    .test-btn.danger { background:#f44336; }
+    .test-btn.danger:hover { background:#d32f2f; }
+    .code-block { background:#f5f5f5; padding:15px; border-radius:4px; font-family:monospace; font-size:12px; overflow-x:auto; margin:10px 0; }
+    .check-item { display:flex; align-items:center; gap:10px; margin:8px 0; padding:8px; background:#f9f9f9; border-radius:4px; }
+    .check-icon { width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:14px; border-radius:50%; }
+    .check-icon.pass { background:#4CAF50; color:white; }
+    .check-icon.fail { background:#f44336; color:white; }
+    .check-icon.warn { background:#ff9800; color:white; }
+    .storage-key { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; }
+    .storage-key:last-child { border-bottom:none; }
+    .storage-key .value { font-family:monospace; font-size:11px; color:#666; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>🔧 同步调试工具</h1>
+    <p>诊断 index.html 与 pet.html 之间的同步问题</p>
+  </div>
+
+  <div class="panel">
+    <h2>🛡️ 环境检测</h2>
+    <div id="env-checks"></div>
+  </div>
+
+  <div class="panel">
+    <h2>📦 localStorage 当前状态</h2>
+    <div id="storage-status"></div>
+    <button class="test-btn" onclick="refreshStorage()">刷新</button>
+    <button class="test-btn danger" onclick="clearStorage()">清空存储</button>
+  </div>
+
+  <div class="panel">
+    <h2>🎯 测试操作</h2>
+    <button class="test-btn" onclick="testWriteSync()">测试写入同步键</button>
+    <button class="test-btn" onclick="testStorageEvent()">测试 storage 事件</button>
+    <button class="test-btn" onclick="testSwitchPet()">测试切换宠物</button>
+  </div>
+
+  <div class="panel">
+    <h2>📝 调试日志</h2>
+    <div id="debug-log" class="log"></div>
+  </div>
+
+  <div class="panel">
+    <h2>💡 常见问题排查</h2>
+    <div class="code-block">
+      <strong>1. localStorage 被禁用</strong><br>
+      原因：浏览器隐私设置、无痕模式、安全策略<br>
+      解决：在浏览器设置中允许 localStorage
+    </div>
+    <div class="code-block">
+      <strong>2. storage 事件不触发</strong><br>
+      原因：同一标签页内写入不会触发 storage 事件<br>
+      解决：必须在不同标签页/窗口之间测试
+    </div>
+    <div class="code-block">
+      <strong>3. 跨域问题</strong><br>
+      原因：不同域名/端口访问<br>
+      解决：确保在同一域名下访问
+    </div>
+    <div class="code-block">
+      <strong>4. 数据格式错误</strong><br>
+      原因：JSON 解析失败<br>
+      解决：检查 sl_pet_sync 的数据格式是否正确
+    </div>
+  </div>
+
+  <script>
+    const LS = {
+      get(key, fallback) {
+        try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+        catch (e) { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+        catch (e) { return false; }
+      },
+      remove(key) {
+        try { localStorage.removeItem(key); return true; }
+        catch (e) { return false; }
+      },
+      clear() {
+        try { localStorage.clear(); return true; }
+        catch (e) { return false; }
+      },
+      keys() {
+        try { return Object.keys(localStorage); }
+        catch (e) { return []; }
+      }
+    };
+
+    const logContainer = document.getElementById('debug-log');
+
+    function log(type, message) {
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().padStart(3,'0')}`;
+      const typeClass = `log-${type}`;
+      const line = `<div class="log-line"><span class="log-time">[${timeStr}]</span><span class="${typeClass}">[${type.toUpperCase()}]</span>${message}</div>`;
+      logContainer.innerHTML = line + logContainer.innerHTML;
+      if (logContainer.children.length > 100) {
+        logContainer.removeChild(logContainer.lastChild);
+      }
+    }
+
+    function checkEnvironment() {
+      const checks = [
+        {
+          name: 'localStorage 可用性',
+          test: () => {
+            try {
+              const testKey = '__test_storage__';
+              localStorage.setItem(testKey, 'test');
+              localStorage.removeItem(testKey);
+              return { pass: true, msg: 'localStorage 可用' };
+            } catch (e) {
+              return { pass: false, msg: `localStorage 不可用: ${e.message}` };
+            }
+          }
+        },
+        {
+          name: '存储容量',
+          test: () => {
+            try {
+              const used = JSON.stringify(localStorage).length;
+              const max = 5 * 1024 * 1024; // 5MB
+              const percent = ((used / max) * 100).toFixed(2);
+              return { pass: used < max * 0.9, msg: `已使用 ${(used/1024).toFixed(1)} KB / 5 MB (${percent}%)` };
+            } catch (e) {
+              return { pass: false, msg: '无法检测存储容量' };
+            }
+          }
+        },
+        {
+          name: '当前协议',
+          test: () => {
+            const protocol = window.location.protocol;
+            return { pass: protocol === 'https:' || protocol === 'http:', msg: `当前协议: ${protocol}` };
+          }
+        },
+        {
+          name: '当前域名',
+          test: () => {
+            return { pass: true, msg: `域名: ${window.location.hostname}` };
+          }
+        },
+        {
+          name: 'iframe 隔离',
+          test: () => {
+            const isIframe = window.self !== window.top;
+            return { pass: !isIframe, msg: isIframe ? '当前在 iframe 中，可能影响 localStorage' : '不在 iframe 中' };
+          }
+        },
+        {
+          name: '无痕模式检测',
+          test: () => {
+            try {
+              localStorage.setItem('__incognito_test__', 'test');
+              localStorage.removeItem('__incognito_test__');
+              return { pass: true, msg: '非无痕模式' };
+            } catch (e) {
+              return { pass: false, msg: '可能在无痕模式下，localStorage 受限' };
+            }
+          }
+        }
+      ];
+
+      const container = document.getElementById('env-checks');
+      container.innerHTML = '';
+
+      checks.forEach(check => {
+        const result = check.test();
+        const icon = result.pass ? '✓' : (result.msg.includes('可能') || result.msg.includes('警告') ? '⚠' : '✗');
+        const iconClass = result.pass ? 'pass' : (result.msg.includes('可能') || result.msg.includes('警告') ? 'warn' : 'fail');
+        
+        const item = document.createElement('div');
+        item.className = 'check-item';
+        item.innerHTML = `
+          <div class="check-icon ${iconClass}">${icon}</div>
+          <div>
+            <strong>${check.name}</strong><br>
+            <span style="color:#666;font-size:12px;">${result.msg}</span>
+          </div>
+        `;
+        container.appendChild(item);
+
+        if (!result.pass) {
+          log('error', `${check.name}: ${result.msg}`);
+        } else {
+          log('success', `${check.name}: ${result.msg}`);
+        }
+      });
+    }
+
+    function refreshStorage() {
+      const container = document.getElementById('storage-status');
+      const keys = LS.keys();
+      
+      if (keys.length === 0) {
+        container.innerHTML = '<div class="status warning">localStorage 为空</div>';
+        return;
+      }
+
+      let html = '';
+      keys.forEach(key => {
+        let value = localStorage.getItem(key);
+        let displayValue = value;
+        
+        try {
+          const parsed = JSON.parse(value);
+          displayValue = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+          // 不是 JSON
+        }
+
+        html += `
+          <div class="storage-key">
+            <span style="font-weight:bold;color:#333;">${key}</span>
+            <span class="value">${displayValue.substring(0, 100)}${displayValue.length > 100 ? '...' : ''}</span>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      log('info', '已刷新 localStorage 状态');
+    }
+
+    function clearStorage() {
+      if (confirm('确定要清空所有 localStorage 数据吗？这将清除所有宠物数据！')) {
+        LS.clear();
+        refreshStorage();
+        log('warning', '已清空 localStorage');
+      }
+    }
+
+    function testWriteSync() {
+      const testData = {
+        emoji: '🐱',
+        name: '测试猫',
+        type: 'cat',
+        ts: Date.now()
+      };
+      
+      const success = LS.set('sl_pet_sync', testData);
+      if (success) {
+        log('success', '成功写入 sl_pet_sync');
+        refreshStorage();
+      } else {
+        log('error', '写入 sl_pet_sync 失败');
+      }
+    }
+
+    function testStorageEvent() {
+      log('info', '请在另一个标签页打开此页面，然后点击下方按钮测试 storage 事件');
+      
+      window.addEventListener('storage', function handler(e) {
+        log('success', `收到 storage 事件: key=${e.key}, oldValue=${e.oldValue ? '有值' : 'null'}, newValue=${e.newValue ? '有值' : 'null'}`);
+        
+        if (e.key === 'sl_pet_sync' && e.newValue) {
+          try {
+            const data = JSON.parse(e.newValue);
+            log('info', `同步数据: ${data.emoji} ${data.name} (${data.type})`);
+          } catch (err) {
+            log('error', '解析同步数据失败: ' + err.message);
+          }
+        }
+        
+        window.removeEventListener('storage', handler);
+      });
+
+      setTimeout(() => {
+        log('info', 'storage 事件监听器已准备就绪');
+      }, 100);
+    }
+
+    function testSwitchPet() {
+      const animals = [
+        { type:'cat', emoji:'🐱', name:'小猫咪' },
+        { type:'dog', emoji:'🐶', name:'小狗狗' },
+        { type:'rabbit', emoji:'🐰', name:'小兔子' },
+        { type:'fox', emoji:'🦊', name:'小狐狸' },
+      ];
+
+      const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
+      
+      const syncData = {
+        emoji: randomAnimal.emoji,
+        name: randomAnimal.name,
+        type: randomAnimal.type,
+        ts: Date.now()
+      };
+
+      LS.set('sl_pet_sync', syncData);
+      
+      let collection = LS.get('sl_collection', []);
+      if (!collection.some(c => c.type === randomAnimal.type)) {
+        collection.push({
+          emoji: randomAnimal.emoji,
+          name: randomAnimal.name,
+          type: randomAnimal.type,
+          date: new Date().toLocaleDateString('zh-CN')
+        });
+        LS.set('sl_collection', collection);
+      }
+
+      log('success', `已切换到 ${randomAnimal.emoji} ${randomAnimal.name}`);
+      refreshStorage();
+    }
+
+    window.addEventListener('storage', function(e) {
+      log('info', `storage 事件: ${e.key}`);
+      if (e.key === 'sl_pet_sync') {
+        log('success', '检测到 sl_pet_sync 变化');
+        refreshStorage();
+      }
+    });
+
+    log('info', '调试工具已加载');
+    checkEnvironment();
+    refreshStorage();
+  </script>
+</body>
+</html>

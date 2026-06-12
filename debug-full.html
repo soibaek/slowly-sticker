@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>完整调试工具 · 慢慢贴</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background:#f5f5f5; padding:20px; }
+    .panel { background:#fff; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    h1 { color:#333; margin-bottom:20px; font-size:20px; }
+    h2 { color:#666; margin:15px 0 10px; font-size:16px; }
+    .status { padding:12px; border-radius:6px; margin:10px 0; font-family:monospace; font-size:12px; }
+    .status.success { background:#e8f5e9; color:#2e7d32; border-left:4px solid #4CAF50; }
+    .status.warning { background:#fff3e0; color:#e65100; border-left:4px solid #ff9800; }
+    .status.error { background:#ffebee; color:#c62828; border-left:4px solid #f44336; }
+    .status.info { background:#e3f2fd; color:#1565c0; border-left:4px solid #2196F3; }
+    .log { background:#1a1a1a; color:#fff; padding:15px; border-radius:6px; font-family:monospace; font-size:11px; max-height:400px; overflow-y:auto; }
+    .log-line { margin:3px 0; }
+    .log-time { color:#888; margin-right:8px; }
+    .log-success { color:#4CAF50; }
+    .log-warning { color:#ff9800; }
+    .log-error { color:#f44336; }
+    .log-info { color:#2196F3; }
+    .test-btn {
+      padding:12px 24px; margin:5px;
+      background:#2196F3; color:white;
+      border:none; border-radius:4px;
+      cursor:pointer; font-size:13px;
+      transition:background 0.2s;
+    }
+    .test-btn:hover { background:#1976D2; }
+    .test-btn.danger { background:#f44336; }
+    .test-btn.danger:hover { background:#d32f2f; }
+    .check-item { display:flex; align-items:center; gap:10px; margin:8px 0; padding:12px; background:#f9f9f9; border-radius:4px; }
+    .check-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:14px; border-radius:50%; }
+    .check-icon.pass { background:#4CAF50; color:white; }
+    .check-icon.fail { background:#f44336; color:white; }
+    .check-icon.warn { background:#ff9800; color:white; }
+    .storage-key { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; }
+    .storage-key:last-child { border-bottom:none; }
+    .storage-key .value { font-family:monospace; font-size:11px; color:#666; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .animal-btn {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:12px 20px; margin:8px;
+      background:#4CAF50; color:white;
+      border:none; border-radius:6px;
+      cursor:pointer; font-size:14px;
+      transition:all 0.2s;
+    }
+    .animal-btn:hover { background:#45a049; transform:scale(1.02); }
+    .animal-btn.active { background:#2E7D32; box-shadow:0 0 0 3px rgba(76,175,80,0.3); }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>🔧 完整调试工具</h1>
+    <p>检查切换动物和打开收集册时的跨域与存储访问问题</p>
+  </div>
+
+  <div class="panel">
+    <h2>🛡️ 环境检测</h2>
+    <div id="env-checks"></div>
+  </div>
+
+  <div class="panel">
+    <h2>📦 localStorage 当前状态</h2>
+    <div id="storage-status"></div>
+    <button class="test-btn" onclick="refreshStorage()">刷新存储状态</button>
+  </div>
+
+  <div class="panel">
+    <h2>🎮 测试操作</h2>
+    <div id="animal-buttons"></div>
+    <button class="test-btn" onclick="testStorageEvent()">测试 Storage 事件</button>
+    <button class="test-btn" onclick="openPetWindow()">打开桌宠窗口</button>
+  </div>
+
+  <div class="panel">
+    <h2>📝 实时日志</h2>
+    <div id="debug-log" class="log"></div>
+  </div>
+
+  <script>
+    const LS = {
+      get(key, fallback) {
+        try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+        catch (e) { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+        catch (e) { return false; }
+      },
+      remove(key) {
+        try { localStorage.removeItem(key); return true; }
+        catch (e) { return false; }
+      },
+      clear() {
+        try { localStorage.clear(); return true; }
+        catch (e) { return false; }
+      },
+      keys() {
+        try { return Object.keys(localStorage); }
+        catch (e) { return []; }
+      }
+    };
+
+    const SYNC_KEY = 'sl_pet_sync';
+    const COL_KEY = 'sl_collection';
+
+    const ANIMALS = [
+      { type:'cat',      emoji:'🐱', name:'小咪' },
+      { type:'dog',      emoji:'🐶', name:'小汪' },
+      { type:'rabbit',   emoji:'🐰', name:'小兔兔' },
+      { type:'fox',      emoji:'🦊', name:'小狐' },
+      { type:'hamster',  emoji:'🐹', name:'小仓鼠' },
+      { type:'snake',    emoji:'🐍', name:'小蛇蛇' },
+      { type:'bear',     emoji:'🐻', name:'小熊熊' },
+      { type:'raccoon',  emoji:'🦝', name:'小浣熊' },
+    ];
+
+    const logContainer = document.getElementById('debug-log');
+
+    function log(type, message) {
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().padStart(3,'0')}`;
+      const typeClass = `log-${type}`;
+      const line = `<div class="log-line"><span class="log-time">[${timeStr}]</span><span class="${typeClass}">[${type.toUpperCase()}]</span>${message}</div>`;
+      logContainer.innerHTML = line + logContainer.innerHTML;
+      if (logContainer.children.length > 100) {
+        logContainer.removeChild(logContainer.lastChild);
+      }
+    }
+
+    function checkEnvironment() {
+      const checks = [
+        {
+          name: 'localStorage 可用性',
+          test: () => {
+            try {
+              const testKey = '__test_storage__';
+              localStorage.setItem(testKey, 'test');
+              localStorage.removeItem(testKey);
+              return { pass: true, msg: 'localStorage 可用' };
+            } catch (e) {
+              return { pass: false, msg: `localStorage 不可用: ${e.message}` };
+            }
+          }
+        },
+        {
+          name: '存储容量',
+          test: () => {
+            try {
+              const used = JSON.stringify(localStorage).length;
+              const max = 5 * 1024 * 1024;
+              const percent = ((used / max) * 100).toFixed(2);
+              return { pass: used < max * 0.9, msg: `已使用 ${(used/1024).toFixed(1)} KB / 5 MB (${percent}%)` };
+            } catch (e) {
+              return { pass: false, msg: '无法检测存储容量' };
+            }
+          }
+        },
+        {
+          name: '当前协议',
+          test: () => {
+            const protocol = window.location.protocol;
+            return { pass: protocol === 'https:' || protocol === 'http:', msg: `当前协议: ${protocol}` };
+          }
+        },
+        {
+          name: '当前域名',
+          test: () => {
+            return { pass: true, msg: `域名: ${window.location.hostname}` };
+          }
+        },
+        {
+          name: 'iframe 隔离',
+          test: () => {
+            const isIframe = window.self !== window.top;
+            return { pass: !isIframe, msg: isIframe ? '当前在 iframe 中，可能影响 localStorage' : '不在 iframe 中' };
+          }
+        },
+        {
+          name: '无痕模式检测',
+          test: () => {
+            try {
+              localStorage.setItem('__incognito_test__', 'test');
+              localStorage.removeItem('__incognito_test__');
+              return { pass: true, msg: '非无痕模式' };
+            } catch (e) {
+              return { pass: false, msg: '可能在无痕模式下，localStorage 受限' };
+            }
+          }
+        },
+        {
+          name: 'sl_pet_sync 同步键',
+          test: () => {
+            const data = LS.get(SYNC_KEY, null);
+            if (data && data.type) {
+              return { pass: true, msg: `存在: ${data.emoji} ${data.name}` };
+            } else {
+              return { pass: false, msg: '不存在或无效' };
+            }
+          }
+        },
+        {
+          name: 'sl_collection 收集册',
+          test: () => {
+            const data = LS.get(COL_KEY, []);
+            if (Array.isArray(data) && data.length > 0) {
+              return { pass: true, msg: `存在 ${data.length} 个动物` };
+            } else {
+              return { pass: false, msg: '为空或不存在' };
+            }
+          }
+        }
+      ];
+
+      const container = document.getElementById('env-checks');
+      container.innerHTML = '';
+
+      checks.forEach(check => {
+        const result = check.test();
+        const icon = result.pass ? '✓' : (result.msg.includes('可能') ? '⚠' : '✗');
+        const iconClass = result.pass ? 'pass' : (result.msg.includes('可能') ? 'warn' : 'fail');
+        
+        const item = document.createElement('div');
+        item.className = 'check-item';
+        item.innerHTML = `
+          <div class="check-icon ${iconClass}">${icon}</div>
+          <div>
+            <strong>${check.name}</strong><br>
+            <span style="color:#666;font-size:12px;">${result.msg}</span>
+          </div>
+        `;
+        container.appendChild(item);
+
+        if (!result.pass) {
+          log('error', `${check.name}: ${result.msg}`);
+        } else {
+          log('success', `${check.name}: ${result.msg}`);
+        }
+      });
+    }
+
+    function refreshStorage() {
+      const container = document.getElementById('storage-status');
+      const keys = LS.keys();
+      
+      if (keys.length === 0) {
+        container.innerHTML = '<div class="status warning">localStorage 为空</div>';
+        return;
+      }
+
+      let html = '';
+      keys.forEach(key => {
+        let value = localStorage.getItem(key);
+        let displayValue = value;
+        
+        try {
+          const parsed = JSON.parse(value);
+          displayValue = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+          // 不是 JSON
+        }
+
+        html += `
+          <div class="storage-key">
+            <span style="font-weight:bold;color:#333;">${key}</span>
+            <span class="value">${displayValue.substring(0, 150)}${displayValue.length > 150 ? '...' : ''}</span>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      log('info', '已刷新 localStorage 状态');
+    }
+
+    function initAnimalButtons() {
+      const container = document.getElementById('animal-buttons');
+      container.innerHTML = '';
+      
+      ANIMALS.forEach(animal => {
+        const btn = document.createElement('button');
+        btn.className = 'animal-btn';
+        btn.dataset.type = animal.type;
+        btn.innerHTML = `${animal.emoji} ${animal.name}`;
+        btn.addEventListener('click', () => switchAnimal(animal));
+        container.appendChild(btn);
+      });
+    }
+
+    function switchAnimal(animal) {
+      log('info', `开始切换动物: ${animal.emoji} ${animal.name} (${animal.type})`);
+      
+      // 更新同步键
+      const syncData = {
+        emoji: animal.emoji,
+        name: animal.name,
+        type: animal.type,
+        ts: Date.now(),
+      };
+      
+      const syncSuccess = LS.set(SYNC_KEY, syncData);
+      if (syncSuccess) {
+        log('success', `✓ 写入 ${SYNC_KEY} 成功`);
+      } else {
+        log('error', `✗ 写入 ${SYNC_KEY} 失败 - 可能被拦截`);
+      }
+
+      // 更新收集册
+      let collection = LS.get(COL_KEY, []);
+      if (!collection.some(c => c.type === animal.type)) {
+        collection.push({
+          emoji: animal.emoji,
+          name: animal.name,
+          type: animal.type,
+          date: new Date().toLocaleDateString('zh-CN'),
+        });
+        
+        const colSuccess = LS.set(COL_KEY, collection);
+        if (colSuccess) {
+          log('success', `✓ 添加到 ${COL_KEY} 成功`);
+        } else {
+          log('error', `✗ 添加到 ${COL_KEY} 失败 - 可能被拦截`);
+        }
+      }
+
+      // 更新按钮状态
+      document.querySelectorAll('.animal-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === animal.type);
+      });
+
+      refreshStorage();
+    }
+
+    function testStorageEvent() {
+      log('info', '准备测试 storage 事件...');
+      log('info', '请在另一个标签页打开 pet.html 或 index.html');
+      
+      window.addEventListener('storage', function handler(e) {
+        log('success', `收到 storage 事件: key=${e.key}`);
+        
+        if (e.key === SYNC_KEY && e.newValue) {
+          try {
+            const data = JSON.parse(e.newValue);
+            log('info', `同步数据: ${data.emoji} ${data.name} (${data.type})`);
+          } catch (err) {
+            log('error', '解析同步数据失败: ' + err.message);
+          }
+        }
+        
+        window.removeEventListener('storage', handler);
+      });
+
+      // 写入测试数据触发事件
+      setTimeout(() => {
+        LS.set(SYNC_KEY, {
+          emoji: '🐱',
+          name: '测试猫',
+          type: 'cat',
+          ts: Date.now(),
+        });
+        log('info', '已写入测试数据，检查其他标签页是否收到事件');
+      }, 500);
+    }
+
+    function openPetWindow() {
+      log('info', '正在打开桌宠窗口...');
+      const petWindow = window.open('pet.html', '_blank', 'width=400,height=500');
+      if (petWindow) {
+        log('success', '✓ 桌宠窗口已打开');
+      } else {
+        log('error', '✗ 无法打开桌宠窗口 - 可能被弹窗拦截器阻止');
+      }
+    }
+
+    // 监听所有错误
+    window.addEventListener('error', function(e) {
+      log('error', `JavaScript 错误: ${e.message} at ${e.filename}:${e.lineno}`);
+    });
+
+    // 监听 Promise 拒绝
+    window.addEventListener('unhandledrejection', function(e) {
+      log('error', `Promise 拒绝: ${e.reason}`);
+    });
+
+    // 监听网络错误
+    navigator.connection.addEventListener('change', function(e) {
+      if (!navigator.onLine) {
+        log('warning', '网络连接已断开');
+      } else {
+        log('success', '网络连接已恢复');
+      }
+    });
+
+    // 初始化
+    log('info', '=== 调试工具已加载 ===');
+    checkEnvironment();
+    refreshStorage();
+    initAnimalButtons();
+    log('info', '=== 初始化完成，准备测试 ===');
+  </script>
+</body>
+</html>

@@ -31,7 +31,15 @@
     position: relative;
     user-select: none;
   }
-  #stage { position: fixed; inset: 0; }
+  #stage { 
+  position: fixed; 
+  inset: 0; 
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(110,95,55,0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(110,95,55,0.10) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
 
   /* ============ 通用像素面板 ============ */
   .panel {
@@ -411,17 +419,291 @@
 
 <script>
 // ============================================================
+//  LS 辅助（与 index.html 保持一致）
+// ============================================================
+const LS = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch (e) { return false; }
+  }
+};
+
+// ============================================================
+//  AI 对话配置（与 index.html 保持一致）
+// ============================================================
+const AI_CONFIG = {
+  apiKey: '4106f7636b41474993e11c076149145d.pbomVyWJBgiYRS0q',
+  apiUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+  model: 'glm-4',
+  maxHistory: 10,
+  temperature: 0.8,
+};
+
+// 动物类型映射表
+const animalTypeMap = {
+  cat: '小猫',
+  dog: '小狗',
+  bear: '小熊',
+  rabbit: '小兔',
+  fox: '小狐狸',
+  hamster: '小仓鼠',
+  snake: '小蛇',
+  raccoon: '小浣熊',
+};
+
+// 性格映射表（与 index.html 保持一致）
+const personalityMap = {
+  cat: '你是一只温柔的小猫，有时有点小傲娇，说话轻声细语。',
+  dog: '你是一只活泼的小狗，总是充满热情，喜欢用感叹号和肢体语言。',
+  bear: '你是一只憨厚的小熊，说话慢悠悠的，很温暖，有时候有点迷糊。',
+  rabbit: '你是一只害羞的小兔，容易脸红，说话声音很小，总是用"那个……"开头。',
+  fox: '你是一只聪明的小狐狸，有点小机灵，喜欢开玩笑但不过分。',
+  hamster: '你是一只圆滚滚的小仓鼠，说话快快的，总惦记着瓜子。',
+  snake: '你是一只安静的小蛇，说话慢条斯理，有时候会给建议。',
+  raccoon: '你是一只呆萌的小浣熊，软软的，说话有点慢，喜欢陪在用户身边。',
+};
+
+let chatMessages = [];
+let isChatLoading = false;
+
+// ============================================================
+//  同步调试日志工具
+// ============================================================
+function logSync(type, message, data = null) {
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().padStart(3,'0')}`;
+  const prefix = `%c[桌宠同步] ${timeStr}`;
+  const typeColors = {
+    'INFO': 'color: #2196F3',
+    'SUCCESS': 'color: #4CAF50',
+    'WARNING': 'color: #ff9800',
+    'ERROR': 'color: #f44336',
+    'STORAGE': 'color: #9c27b0',
+    'API': 'color: #00bcd4',
+  };
+  const typeColor = typeColors[type] || 'color: #333';
+  
+  if (data) {
+    console.log(`${prefix} %c${message}`, 'color: #666', typeColor, data);
+  } else {
+    console.log(`${prefix} %c${message}`, 'color: #666', typeColor);
+  }
+}
+
+// ============================================================
+//  同步键（与 index.html 的 petManager 配合）
+// ============================================================
+const SYNC_KEY = 'sl_pet_sync';
+const COL_KEY   = 'sl_collection';
+
+// 从 index.html 同步过来的当前宠物（含 name / type）
+let syncedPet = null;
+
+function loadSyncedPet() {
+  logSync('INFO', '开始加载同步宠物数据...');
+  try {
+    const data = LS.get(SYNC_KEY, null);
+    logSync('STORAGE', `读取 ${SYNC_KEY}:`, data);
+    
+    if (data && data.type) {
+      syncedPet = { emoji: data.emoji, name: data.name, img: data.img, type: data.type };
+      logSync('SUCCESS', `成功加载同步宠物: ${data.emoji} ${data.name} (${data.type})`);
+      return true;
+    } else {
+      logSync('WARNING', '未找到有效的同步数据');
+      return false;
+    }
+  } catch (e) {
+    logSync('ERROR', `加载同步数据失败: ${e.message}`);
+    return false;
+  }
+}
+
+function getHatchedKeys() {
+  logSync('INFO', '获取已孵化动物列表...');
+  const set = new Set();
+  try {
+    const col = LS.get(COL_KEY, []);
+    logSync('STORAGE', `读取 ${COL_KEY}:`, col);
+    
+    const emojiMap = {
+      '🐱':'cat','🐶':'dog','🐰':'rabbit','🐍':'snake',
+      '🦊':'fox','🐻':'bear','🦝':'raccoon','🐹':'hamster'
+    };
+    col.forEach(item => {
+      const t = item.type || emojiMap[item.emoji];
+      if (t) set.add(t);
+    });
+    logSync('SUCCESS', `已孵化动物: ${[...set].join(', ')}`);
+  } catch (e) {
+    logSync('ERROR', `获取已孵化列表失败: ${e.message}`);
+  }
+  return set;
+}
+
+function findAnimalByKey(key) {
+  logSync('INFO', `查找动物: ${key}`);
+  const animal = ANIMALS.find(a => a.key === key);
+  if (animal) {
+    logSync('SUCCESS', `找到动物: ${animal.name} (${animal.key})`);
+  } else {
+    logSync('WARNING', `未找到动物: ${key}`);
+  }
+  return animal;
+}
+
+// 将当前动物的切换写回 localStorage，供 index.html 读取
+function syncToParent() {
+  if (!curAnimal) {
+    logSync('WARNING', '无法同步：curAnimal 为空');
+    return;
+  }
+  
+  logSync('INFO', `准备同步到 index.html: ${curAnimal.name} (${curAnimal.key})`);
+  try {
+    const syncData = {
+      emoji: curAnimal.emoji || '',
+      name: syncedPet ? syncedPet.name : curAnimal.name,
+      img: curAnimal.img || null,
+      type: curAnimal.key,
+      ts: Date.now(),
+    };
+    
+    const success = LS.set(SYNC_KEY, syncData);
+    if (success) {
+      logSync('SUCCESS', `已写入 ${SYNC_KEY}:`, syncData);
+    } else {
+      logSync('ERROR', `写入 ${SYNC_KEY} 失败`);
+    }
+  } catch (e) {
+    logSync('ERROR', `同步失败: ${e.message}`);
+  }
+}
+
+// ============================================================
+//  AI 对话函数
+// ============================================================
+function getSystemPrompt() {
+  const petName = syncedPet ? syncedPet.name : curAnimal.name;
+  const animalTypeName = animalTypeMap[curAnimal.key] || '小动物';
+  const personality = personalityMap[curAnimal.key] || '';
+  return `${personality}你是一只${animalTypeName}，名字叫${petName}。你喜欢和用户聊天，语气自然温暖，像朋友一样。每次回复不要重复相同的话。`;
+}
+
+function buildMessages() {
+  const messages = [{ role: 'system', content: getSystemPrompt() }];
+  chatMessages.forEach(msg => {
+    messages.push({ role: msg.role, content: msg.content });
+  });
+  return messages;
+}
+
+async function callAI(message) {
+  if (isChatLoading) {
+    logSync('WARNING', 'AI 调用被忽略：正在加载中');
+    return '';
+  }
+  
+  logSync('API', `开始 AI 调用，消息: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`);
+  logSync('INFO', `当前宠物: ${syncedPet ? syncedPet.name : curAnimal.name} (${curAnimal.key})`);
+  
+  const systemPrompt = getSystemPrompt();
+  logSync('INFO', `系统提示词: ${systemPrompt.substring(0, 50)}${systemPrompt.length > 50 ? '...' : ''}`);
+  
+  isChatLoading = true;
+  
+  chatMessages.push({ role: 'user', content: message });
+  
+  if (chatMessages.length > AI_CONFIG.maxHistory * 2) {
+    chatMessages = chatMessages.slice(-AI_CONFIG.maxHistory * 2);
+  }
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 30000);
+    
+    logSync('API', `发送请求到: ${AI_CONFIG.apiUrl}`);
+    logSync('API', `模型: ${AI_CONFIG.model}, temperature: ${AI_CONFIG.temperature}`);
+    
+    const startTime = Date.now();
+    const response = await fetch(AI_CONFIG.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AI_CONFIG.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: AI_CONFIG.model,
+        messages: buildMessages(),
+        temperature: AI_CONFIG.temperature,
+        max_tokens: 500,
+      }),
+      signal: controller.signal,
+    });
+    
+    const responseTime = Date.now() - startTime;
+    logSync('API', `响应时间: ${responseTime}ms, 状态码: ${response.status}`);
+    
+    clearTimeout(timeoutId);
+    
+    let data;
+    try {
+      data = await response.json();
+      logSync('API', '响应数据解析成功');
+    } catch (parseError) {
+      logSync('ERROR', `响应数据解析失败: ${parseError.message}`);
+      throw new Error('服务器返回的数据格式有误，请稍后重试');
+    }
+    
+    if (!response.ok) {
+      const errorMsg = data.error?.message || `请求失败，状态码: ${response.status}`;
+      logSync('ERROR', `API 请求失败: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    
+    if (!data.choices || !data.choices[0]?.message?.content) {
+      logSync('ERROR', '未获取到有效的响应内容');
+      throw new Error('未获取到有效的响应内容');
+    }
+    
+    const reply = data.choices[0].message.content.trim();
+    logSync('SUCCESS', `AI 响应成功: "${reply.substring(0, 50)}${reply.length > 50 ? '...' : ''}"`);
+    
+    chatMessages.push({ role: 'assistant', content: reply });
+    
+    if (chatMessages.length > AI_CONFIG.maxHistory * 2) {
+      chatMessages = chatMessages.slice(-AI_CONFIG.maxHistory * 2);
+    }
+    
+    return reply;
+  } catch (error) {
+    logSync('ERROR', `AI 调用失败: ${error.message}`);
+    console.error('AI 调用失败详情:', error);
+    return '';
+  } finally {
+    isChatLoading = false;
+    logSync('API', 'AI 调用结束');
+  }
+}
+
+// ============================================================
 //  数据
 // ============================================================
 const ANIMALS = [
-  { key:'cat',      name:'像素猫',  img:'assets/pets/cat.png',      toy:{cls:'cat-teaser',  e:'🪶', label:'逗猫棒'} },
-  { key:'dog',      name:'像素狗',  img:'assets/pets/dog.png',      toy:{cls:'dog-frisbee', e:'🥏', label:'飞盘'} },
-  { key:'rabbit',   name:'像素兔',  img:'assets/pets/rabbit.png',   toy:{cls:'rabbit-ball', e:'🟢', label:'草球'} },
-  { key:'fox',      name:'像素狐',  img:'assets/pets/fox.png',      toy:{cls:'fox-ball',    e:'⚽', label:'玩具球'} },
-  { key:'hamster',  name:'仓鼠球',  img:'assets/pets/hamster.png',  toy:{cls:'hamster-wheel',e:'⚙️', label:'跑轮'} },
-  { key:'snake',    name:'小蛇蛇',  img:'assets/pets/snake.png',    toy:{cls:'snake-branch',e:'🌿', label:'攀爬架'} },
-  { key:'bear',     name:'小熊熊',  img:'assets/pets/bear.png',     toy:{cls:'bear-ball',   e:'🔴', label:'大球'} },
-  { key:'redpanda', name:'小浣熊',  img:'assets/pets/redpanda.png', toy:{cls:'fox-ball',    e:'⚽', label:'玩具球'} },
+  { key:'cat',      emoji:'🐱', name:'像素猫',  img:'assets/pets/cat.png',      toy:{cls:'cat-teaser',  e:'🪶', label:'逗猫棒'} },
+  { key:'dog',      emoji:'🐶', name:'像素狗',  img:'assets/pets/dog.png',      toy:{cls:'dog-frisbee', e:'🥏', label:'飞盘'} },
+  { key:'rabbit',   emoji:'🐰', name:'像素兔',  img:'assets/pets/rabbit.png',   toy:{cls:'rabbit-ball', e:'🟢', label:'草球'} },
+  { key:'fox',      emoji:'🦊', name:'像素狐',  img:'assets/pets/fox.png',      toy:{cls:'fox-ball',    e:'⚽', label:'玩具球'} },
+  { key:'hamster',  emoji:'🐹', name:'仓鼠球',  img:'assets/pets/hamster.png',  toy:{cls:'hamster-wheel',e:'⚙️', label:'跑轮'} },
+  { key:'snake',    emoji:'🐍', name:'小蛇蛇',  img:'assets/pets/snake.png',    toy:{cls:'snake-branch',e:'🌿', label:'攀爬架'} },
+  { key:'bear',     emoji:'🐻', name:'小熊熊',  img:'assets/pets/bear.png',     toy:{cls:'bear-ball',   e:'🔴', label:'大球'} },
+  { key:'raccoon',  emoji:'🦝', name:'小浣熊',  img:'assets/pets/redpanda.png', toy:{cls:'fox-ball',    e:'⚽', label:'玩具球'} },
 ];
 
 const CHITCHAT = [
@@ -447,9 +729,22 @@ const REMINDERS = [
 ];
 
 // ============================================================
-//  状态
+//  状态 — 从 index.html 同步当前宠物
 // ============================================================
-let curAnimal = ANIMALS[0];
+let curAnimal = (() => {
+  if (loadSyncedPet()) {
+    // 根据 syncedPet.type 查找 pet.html 的动物数据
+    const match = findAnimalByKey(syncedPet.type);
+    if (match) return match;
+  }
+  // 兜底：检查已孵化动物，选第一个
+  const hatched = getHatchedKeys();
+  if (hatched.size > 0) {
+    const first = findAnimalByKey([...hatched][0]);
+    if (first) return first;
+  }
+  return ANIMALS[0];
+})();
 let isSleeping = false;
 let isRoaming = false;
 let bubbleHidden = false;
@@ -463,15 +758,18 @@ const stage = document.getElementById('stage');
 // ============================================================
 const pet = document.createElement('div');
 pet.className = 'pet idle';
+const petLabel = syncedPet ? syncedPet.name : curAnimal.name;
 pet.innerHTML = `<img src="${curAnimal.img}" alt="${curAnimal.name}">
-  <span class="label">${curAnimal.name}</span>`;
+  <span class="label" id="pet-label">${petLabel}</span>`;
 stage.appendChild(pet);
 // 初始位置（右下角，呼应截图）
 placePet(window.innerWidth - 260, window.innerHeight - 240, true);
 
 function setPetImg() {
   pet.querySelector('img').src = curAnimal.img;
-  pet.querySelector('.label').textContent = curAnimal.name;
+  // 优先显示同步名（来自 index.html），否则用本地名
+  const lbl = document.getElementById('pet-label');
+  if (lbl) lbl.textContent = syncedPet ? syncedPet.name : curAnimal.name;
 }
 
 // ============================================================
@@ -487,13 +785,16 @@ GHOSTS.forEach(g => {
   el.className = 'ghost';
   el.style.left = g.x + 'px';
   el.style.top  = g.y + 'px';
-  el.innerHTML = `<img src="${curAnimal.img}"><span class="gl">像素猫</span>`;
+  const labelName = syncedPet ? syncedPet.name : curAnimal.name;
+  el.innerHTML = `<img src="${curAnimal.img}"><span class="gl">${labelName}</span>`;
   el.dataset.ghost = '1';
   stage.appendChild(el);
 });
 function refreshGhosts(){
   document.querySelectorAll('.ghost img').forEach(i => i.src = curAnimal.img);
-  document.querySelectorAll('.ghost .gl').forEach(i => i.textContent = curAnimal.name);
+  // 优先显示同步名（来自 index.html），否则用本地名
+  const labelName = syncedPet ? syncedPet.name : curAnimal.name;
+  document.querySelectorAll('.ghost .gl').forEach(i => i.textContent = labelName);
 }
 
 // ============================================================
@@ -669,37 +970,91 @@ function showBubble(text, emoji, comfort) {
 const chatWin = document.createElement('div');
 chatWin.className = 'chatwin';
 document.body.appendChild(chatWin);
-function openChatWin(mode) {
+
+async function openChatWin(mode) {
   const comfort = mode === 'comfort';
-  const pool = comfort ? COMFORT : CHITCHAT;
-  const reply = pool[Math.floor(Math.random()*pool.length)];
   setState('happy');
-  showBubble(reply, comfort?'🍬':'💬', comfort);
+  
   chatWin.innerHTML = `
     <div class="cw-head">
-      <span>${comfort?'🤗 安慰模式':'💬 闲聊模式'} · ${curAnimal.name}</span>
+      <span>${comfort?'🤗 安慰模式':'💬 闲聊模式'} · ${syncedPet ? syncedPet.name : curAnimal.name}</span>
       <span class="x" id="cw-x">✕</span>
     </div>
     <div class="cw-body">
       <div class="cw-reply">
         <span class="tag" style="${comfort?'':'background:#3b6ea5'}">${comfort?'安慰':'闲聊'}</span>
-        ${reply}
-        <div class="api">※ 此处接入 AI API</div>
+        <span id="cw-loading">正在思考中...</span>
       </div>
     </div>
     <div class="cw-input">
       <input id="cw-text" placeholder="跟我说说吧…">
       <button class="tbtn orange" id="cw-send">发送</button>
     </div>
-    <div class="cw-note">※ 文本输入为静态演示 — 需接入 LLM 接口</div>`;
+    <div class="cw-note">💡 支持连续对话，记得喝水哦～</div>`;
   chatWin.classList.add('show');
-  document.getElementById('cw-x').onclick = () => { chatWin.classList.remove('show'); setState('idle'); };
-  document.getElementById('cw-send').onclick = () => {
-    const v = document.getElementById('cw-text').value.trim();
-    const r = pool[Math.floor(Math.random()*pool.length)];
-    showBubble(v ? (comfort?'我听到了，'+r:'嗯嗯～'+r) : r, comfort?'🍬':'💬', comfort);
-    document.getElementById('cw-text').value = '';
+  
+  // 关闭按钮
+  document.getElementById('cw-x').onclick = () => { 
+    chatWin.classList.remove('show'); 
+    setState('idle'); 
   };
+  
+  // 发送按钮
+  document.getElementById('cw-send').onclick = async () => {
+    const input = document.getElementById('cw-text');
+    const v = input.value.trim();
+    if (!v) return;
+    
+    input.value = '';
+    const sendBtn = document.getElementById('cw-send');
+    sendBtn.disabled = true;
+    
+    const cwBody = document.querySelector('.cw-body');
+    cwBody.innerHTML += `
+      <div class="cw-reply" style="background:#e8f5e9;border-color:#81c784;">
+        <span class="tag" style="background:#4CAF50">你</span>
+        ${v}
+      </div>`;
+    
+    cwBody.innerHTML += `
+      <div class="cw-reply">
+        <span class="tag" style="${comfort?'':'background:#3b6ea5'}">${comfort?'安慰':'闲聊'}</span>
+        <span id="cw-loading">正在思考中...</span>
+      </div>`;
+    cwBody.scrollTop = cwBody.scrollHeight;
+    
+    // 调用 AI API
+    const reply = await callAI(v);
+    
+    // 更新显示
+    const loadingEl = document.getElementById('cw-loading');
+    if (loadingEl) {
+      loadingEl.parentElement.innerHTML = `
+        <span class="tag" style="${comfort?'':'background:#3b6ea5'}">${comfort?'安慰':'闲聊'}</span>
+        ${reply || '网络有点卡，再说一次吧～'}
+      `;
+    }
+    
+    // 显示气泡
+    showBubble(reply || '网络有点卡，再说一次吧～', comfort?'🍬':'💬', comfort);
+    
+    cwBody.scrollTop = cwBody.scrollHeight;
+    sendBtn.disabled = false;
+  };
+  
+  // 初始问候
+  const greeting = comfort ? COMFORT[Math.floor(Math.random()*COMFORT.length)] : CHITCHAT[Math.floor(Math.random()*CHITCHAT.length)];
+  const aiReply = await callAI(comfort ? '请安慰我一下' : '跟我随便聊聊');
+  
+  const finalReply = aiReply || greeting;
+  showBubble(finalReply, comfort?'🍬':'💬', comfort);
+  
+  const cwBody = document.querySelector('.cw-body');
+  cwBody.innerHTML = `
+    <div class="cw-reply">
+      <span class="tag" style="${comfort?'':'background:#3b6ea5'}">${comfort?'安慰':'闲聊'}</span>
+      ${finalReply}
+    </div>`;
 }
 
 // ============================================================
@@ -818,25 +1173,40 @@ function renderReminders() {
 }
 
 // ============================================================
-//  宠物选择器
+//  宠物选择器（仅显示已孵化动物）
 // ============================================================
-function buildPicker() {
+function refreshPicker() {
   const wrap = document.getElementById('pet-picker');
+  // 清除旧选项（保留 pp-label）
+  Array.from(wrap.children).forEach(c => {
+    if (!c.classList.contains('pp-label')) c.remove();
+  });
+  const hatchedKeys = getHatchedKeys();
   ANIMALS.forEach(a => {
+    // 仅已孵化
+    if (!hatchedKeys.has(a.key)) return;
     const cell = document.createElement('div');
     cell.className = 'pp-cell' + (a.key === curAnimal.key ? ' active' : '');
     cell.innerHTML = `<img src="${a.img}" alt="${a.name}">`;
     cell.title = a.name;
     cell.addEventListener('click', () => {
+      // 重新读取 synced name
+      loadSyncedPet();
       curAnimal = a;
       setPetImg(); refreshGhosts();
       document.querySelectorAll('.pp-cell').forEach(c=>c.classList.remove('active'));
       cell.classList.add('active');
+      syncToParent();  // ← 写回 localStorage，触发 index.html 同步
       if (isSleeping) wake();
-      showBubble(`我是${a.name}，你好呀！`, '👋', false);
+      const labelName = syncedPet ? syncedPet.name : a.name;
+      showBubble(`我是${labelName}，你好呀！`, '👋', false);
     });
     wrap.appendChild(cell);
   });
+}
+
+function buildPicker() {
+  refreshPicker();
 }
 
 // ============================================================
@@ -876,7 +1246,111 @@ document.addEventListener('click', (e) => {
   clearPopups();
 });
 
-// 定时提醒气泡
+// ============================================================
+//  双向同步：监听 storage 事件（其他标签页写入时触发）
+// ============================================================
+window.addEventListener('storage', function(e) {
+  logSync('STORAGE', `收到 storage 事件: key=${e.key}, newValue=${e.newValue ? '存在' : 'null'}`);
+  
+  if (e.key === SYNC_KEY) {
+    if (!e.newValue) {
+      logSync('WARNING', '同步键被删除，跳过处理');
+      return;
+    }
+    logSync('INFO', '检测到 sl_pet_sync 变化，开始同步...');
+    try {
+      const data = JSON.parse(e.newValue);
+      logSync('STORAGE', '解析同步数据:', data);
+      
+      if (!data || !data.type) {
+        logSync('WARNING', '同步数据无效');
+        return;
+      }
+      
+      // 检查是否已经显示同一只
+      if (syncedPet && syncedPet.type === data.type && syncedPet.name === data.name) {
+        logSync('INFO', '已显示相同宠物，无需更新');
+        return;
+      }
+      
+      // 更新同步数据
+      syncedPet = { emoji: data.emoji, name: data.name, img: data.img, type: data.type };
+      logSync('SUCCESS', `同步数据更新: ${data.emoji} ${data.name} (${data.type})`);
+      
+      // 更新动物
+      const match = findAnimalByKey(data.type);
+      if (match) {
+        curAnimal = match;
+        chatMessages = []; // 切换动物时清空聊天历史
+        setPetImg();
+        refreshGhosts();
+        refreshPicker();
+        if (isSleeping) wake();
+        logSync('SUCCESS', '宠物显示已更新，聊天历史已清空');
+      } else {
+        logSync('ERROR', `未找到动物: ${data.type}`);
+      }
+    } catch (err) {
+      logSync('ERROR', `解析同步数据失败: ${err.message}`);
+    }
+  }
+  
+  // 孵化列表变化也要刷新拾取器
+  if (e.key === COL_KEY) {
+    logSync('INFO', '检测到 sl_collection 变化，刷新拾取器');
+    refreshPicker();
+  }
+});
+
+// ============================================================
+//  轮询兜底（2s 检测一次，兼容 storage 事件不触发的场景）
+// ============================================================
+let _lastTs = syncedPet ? (LS.get(SYNC_KEY, {ts:0}).ts || 0) : 0;
+logSync('INFO', `轮询初始化: _lastTs=${_lastTs}`);
+
+setInterval(() => {
+  const data = LS.get(SYNC_KEY, null);
+  logSync('INFO', `轮询检查: data=${data ? '存在' : 'null'}, ts=${data?.ts || 0}, _lastTs=${_lastTs}`);
+  
+  if (!data || !data.type) {
+    logSync('WARNING', '轮询：同步数据为空');
+    return;
+  }
+  
+  if (data.ts <= _lastTs) {
+    logSync('INFO', '轮询：时间戳未更新，跳过');
+    return;
+  }
+  
+  logSync('SUCCESS', '轮询：检测到新的同步数据');
+  _lastTs = data.ts;
+  
+  // 时间戳更新 → 检查是否需要切换
+  if (syncedPet && syncedPet.type === data.type && syncedPet.name === data.name) {
+    logSync('INFO', '轮询：已显示相同宠物，无需更新');
+    return;
+  }
+  
+  syncedPet = { emoji: data.emoji, name: data.name, img: data.img, type: data.type };
+  logSync('SUCCESS', `轮询同步: ${data.emoji} ${data.name} (${data.type})`);
+  
+  const match = findAnimalByKey(data.type);
+  if (match) {
+    curAnimal = match;
+    chatMessages = []; // 切换动物时清空聊天历史
+    setPetImg();
+    refreshGhosts();
+    refreshPicker();
+    if (isSleeping) wake();
+    logSync('SUCCESS', '轮询同步完成，聊天历史已清空');
+  }
+  // 同时检查拾取器是否需要刷新（孵化数量变化）
+  refreshPicker();
+}, 2000);
+
+// ============================================================
+//  定时提醒气泡
+// ============================================================
 setInterval(() => {
   if (isSleeping || bubbleHidden) return;
   const r = REMINDERS[Math.floor(Math.random()*REMINDERS.length)];

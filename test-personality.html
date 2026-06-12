@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>性格设定测试 - 真实API调用</title>
+  <style>
+    body {
+      font-family: 'Press Start 2P', monospace;
+      background: #D9D2B0;
+      padding: 20px;
+      font-size: 10px;
+      line-height: 2;
+    }
+    .animal-card {
+      background: #FFF9C4;
+      border: 3px solid #5D4037;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 4px 4px 0 #C8B97A;
+    }
+    .emoji { font-size: 24px; }
+    .personality { color: #795548; }
+    .prompt { background: #F5E6B8; padding: 8px; margin-top: 8px; font-size: 8px; }
+    button {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 6px 10px;
+      background: #FFF9C4;
+      border: 2px solid #5D4037;
+      box-shadow: 2px 2px 0 #5D4037;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover { background: #FFE082; }
+    button:active {
+      box-shadow: none;
+      transform: translate(2px, 2px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    #current-display {
+      background: #E8F5E9;
+      border: 3px solid #5D4037;
+      padding: 16px;
+      margin-top: 20px;
+      box-shadow: 4px 4px 0 #92c99a;
+    }
+    .label { font-weight: bold; color: #5D4037; }
+
+    /* 聊天面板样式 */
+    #chat-panel {
+      background: #FFF9C4;
+      border: 3px solid #5D4037;
+      padding: 16px;
+      margin-top: 20px;
+      box-shadow: 4px 4px 0 #C8B97A;
+    }
+    #chat-messages {
+      height: 200px;
+      overflow-y: auto;
+      border: 2px solid #5D4037;
+      padding: 8px;
+      margin-bottom: 12px;
+      background: #fffdeb;
+    }
+    .chat-message {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .chat-message.user {
+      justify-content: flex-end;
+    }
+    .chat-message.assistant {
+      justify-content: flex-start;
+    }
+    .chat-bubble {
+      max-width: 70%;
+      padding: 8px 12px;
+      font-size: 8px;
+      border-radius: 0;
+    }
+    .chat-message.user .chat-bubble {
+      background: #5D4037;
+      color: #FFF9C4;
+    }
+    .chat-message.assistant .chat-bubble {
+      background: #F5E6B8;
+      color: #5D4037;
+      border: 2px solid #5D4037;
+    }
+    .chat-avatar {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    #chat-input {
+      width: calc(100% - 80px);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 8px;
+      border: 2px solid #5D4037;
+      background: #fffdeb;
+    }
+    #chat-send {
+      width: 70px;
+    }
+    .chat-typing {
+      color: #795548;
+      font-size: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      background: #795548;
+      animation: blink 1s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+    #chat-error {
+      color: #c62828;
+      font-size: 7px;
+      margin-top: 8px;
+      display: none;
+    }
+    #chat-error.show { display: block; }
+  </style>
+</head>
+<body>
+  <h1>🐾 性格设定测试 - 真实API</h1>
+  <p style="color: #795548; font-size: 8px; margin-bottom: 16px;">点击下方按钮切换动物，然后发送消息测试真实AI回复</p>
+  
+  <div id="test-controls">
+    <button onclick="testAnimal('cat')">🐱 小猫</button>
+    <button onclick="testAnimal('dog')">🐶 小狗</button>
+    <button onclick="testAnimal('bear')">🐻 小熊</button>
+    <button onclick="testAnimal('rabbit')">🐰 小兔</button>
+    <button onclick="testAnimal('fox')">🦊 小狐狸</button>
+    <button onclick="testAnimal('hamster')">🐹 小仓鼠</button>
+    <button onclick="testAnimal('snake')">🐍 小蛇</button>
+    <button onclick="testAnimal('raccoon')">🦝 小浣熊</button>
+  </div>
+
+  <div id="current-display">
+    <div class="emoji" id="current-emoji">🐱</div>
+    <div><span class="label">动物类型：</span><span id="current-type">cat</span></div>
+    <div><span class="label">中文名称：</span><span id="current-name">小猫</span></div>
+    <div><span class="label">自定义名字：</span><span id="current-custom-name">慢慢</span></div>
+    <div class="personality" id="current-personality">性格描述...</div>
+    <div class="prompt" id="current-prompt">系统提示词...</div>
+  </div>
+
+  <!-- 聊天面板 -->
+  <div id="chat-panel">
+    <h3>💬 聊天测试</h3>
+    <div id="chat-messages"></div>
+    <div style="display: flex; gap: 8px;">
+      <input type="text" id="chat-input" placeholder="输入消息..." />
+      <button id="chat-send">发送</button>
+    </div>
+    <div id="chat-error"></div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  AI 对话配置
+    // ============================================================
+    const AI_CONFIG = {
+      apiKey: '4106f7636b41474993e11c076149145d.pbomVyWJBgiYRS0q',
+      apiUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      model: 'glm-4',
+      maxHistory: 10,
+      temperature: 0.8,
+    };
+
+    // ============================================================
+    //  数据映射表
+    // ============================================================
+    const animalTypeMap = {
+      cat: '小猫',
+      dog: '小狗',
+      bear: '小熊',
+      rabbit: '小兔',
+      fox: '小狐狸',
+      hamster: '小仓鼠',
+      snake: '小蛇',
+      raccoon: '小浣熊',
+    };
+
+    const personalityMap = {
+      cat: '你是一只温柔的小猫，有时有点小傲娇，说话轻声细语。',
+      dog: '你是一只活泼的小狗，总是充满热情，喜欢用感叹号和肢体语言。',
+      bear: '你是一只憨厚的小熊，说话慢悠悠的，很温暖，有时候有点迷糊。',
+      rabbit: '你是一只害羞的小兔，容易脸红，说话声音很小，总是用"那个……"开头。',
+      fox: '你是一只聪明的小狐狸，有点小机灵，喜欢开玩笑但不过分。',
+      hamster: '你是一只圆滚滚的小仓鼠，说话快快的，总惦记着瓜子。',
+      snake: '你是一只安静的小蛇，说话慢条斯理，有时候会给建议。',
+      raccoon: '你是一只呆萌的小浣熊，软软的，说话有点慢，喜欢陪在用户身边。',
+    };
+
+    const animalEmojiMap = {
+      cat: '🐱',
+      dog: '🐶',
+      bear: '🐻',
+      rabbit: '🐰',
+      fox: '🦊',
+      hamster: '🐹',
+      snake: '🐍',
+      raccoon: '🦝',
+    };
+
+    // 模拟 localStorage 中的自定义名字
+    const mockPetNames = {
+      cat: '咪咪',
+      dog: '旺财',
+      bear: '胖达',
+      fox: '狐狐',
+    };
+
+    // ============================================================
+    //  状态
+    // ============================================================
+    let currentAnimalType = 'cat';
+    let chatMessages = [];
+    let isChatLoading = false;
+
+    // ============================================================
+    //  工具函数
+    // ============================================================
+    function getPetName(animalType) {
+      if (mockPetNames[animalType]) {
+        return mockPetNames[animalType];
+      }
+      return animalTypeMap[animalType] || '小动物';
+    }
+
+    function getSystemPrompt(animalType) {
+      const animalTypeName = animalTypeMap[animalType] || '小动物';
+      const petName = getPetName(animalType);
+      const personality = personalityMap[animalType] || '';
+      return `${personality}你是一只${animalTypeName}，名字叫${petName}。你喜欢和用户聊天，语气自然温暖，像朋友一样。每次回复不要重复相同的话。`;
+    }
+
+    function buildMessages() {
+      const messages = [{ role: 'system', content: getSystemPrompt(currentAnimalType) }];
+      chatMessages.forEach(msg => {
+        messages.push({ role: msg.role, content: msg.content });
+      });
+      return messages;
+    }
+
+    // ============================================================
+    //  UI 更新函数
+    // ============================================================
+    function testAnimal(animalType) {
+      currentAnimalType = animalType;
+      const emoji = animalEmojiMap[animalType] || '❓';
+      const name = animalTypeMap[animalType] || '未知';
+      const customName = getPetName(animalType);
+      const personality = personalityMap[animalType] || '暂无性格描述';
+      const prompt = getSystemPrompt(animalType);
+
+      document.getElementById('current-emoji').textContent = emoji;
+      document.getElementById('current-type').textContent = animalType;
+      document.getElementById('current-name').textContent = name;
+      document.getElementById('current-custom-name').textContent = customName;
+      document.getElementById('current-personality').textContent = personality;
+      document.getElementById('current-prompt').textContent = prompt;
+
+      // 更新聊天面板的动物表情
+      renderChatMessages();
+    }
+
+    function renderChatMessages() {
+      const chatMessagesDiv = document.getElementById('chat-messages');
+      chatMessagesDiv.innerHTML = '';
+
+      chatMessages.forEach(msg => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${msg.role}`;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'chat-avatar';
+        avatar.textContent = msg.role === 'user' ? '👤' : animalEmojiMap[currentAnimalType] || '🐱';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+        bubble.textContent = msg.content;
+
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+        chatMessagesDiv.appendChild(messageDiv);
+      });
+
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    function showChatLoading(show) {
+      const chatMessagesDiv = document.getElementById('chat-messages');
+      const typingDiv = chatMessagesDiv.querySelector('.chat-typing');
+
+      if (show) {
+        if (!typingDiv) {
+          const newTyping = document.createElement('div');
+          newTyping.className = 'chat-typing';
+          newTyping.innerHTML = `
+            <span class="chat-avatar">${animalEmojiMap[currentAnimalType] || '🐱'}</span>
+            <span>正在输入...</span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          `;
+          chatMessagesDiv.appendChild(newTyping);
+        }
+      } else {
+        if (typingDiv) {
+          typingDiv.remove();
+        }
+      }
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    function showChatError(message) {
+      const chatError = document.getElementById('chat-error');
+      chatError.textContent = message;
+      chatError.classList.add('show');
+    }
+
+    function hideChatError() {
+      const chatError = document.getElementById('chat-error');
+      chatError.classList.remove('show');
+    }
+
+    // ============================================================
+    //  API 调用函数
+    // ============================================================
+    async function callAI(message) {
+      if (isChatLoading) return;
+
+      isChatLoading = true;
+      showChatLoading(true);
+      hideChatError();
+
+      // 添加用户消息
+      chatMessages.push({ role: 'user', content: message });
+
+      // 保持最近 10 轮对话
+      if (chatMessages.length > AI_CONFIG.maxHistory * 2) {
+        chatMessages = chatMessages.slice(-AI_CONFIG.maxHistory * 2);
+      }
+
+      renderChatMessages();
+
+      try {
+        // 创建超时控制器
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+        }, 30000); // 30秒超时
+
+        const response = await fetch(AI_CONFIG.apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${AI_CONFIG.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: AI_CONFIG.model,
+            messages: buildMessages(),
+            temperature: AI_CONFIG.temperature,
+            max_tokens: 500,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          throw new Error('服务器返回的数据格式有误，请稍后重试');
+        }
+
+        if (!response.ok) {
+          const errorMsg = parseApiError(data, response.status);
+          throw new Error(errorMsg);
+        }
+
+        const reply = data.choices?.[0]?.message?.content || '我不太明白你说的话呢...';
+
+        chatMessages.push({ role: 'assistant', content: reply });
+
+        // 保持最近 10 轮对话
+        if (chatMessages.length > AI_CONFIG.maxHistory * 2) {
+          chatMessages = chatMessages.slice(-AI_CONFIG.maxHistory * 2);
+        }
+
+        renderChatMessages();
+
+      } catch (error) {
+        const friendlyMsg = getFriendlyErrorMessage(error);
+        showChatError(friendlyMsg);
+        // 移除刚才添加的用户消息（因为没有成功发送）
+        chatMessages.pop();
+        renderChatMessages();
+      } finally {
+        isChatLoading = false;
+        showChatLoading(false);
+      }
+    }
+
+    function parseApiError(data, status) {
+      const errorCode = data.error?.code;
+      const errorMsg = data.error?.message || data.message || '未知错误';
+
+      const errorMap = {
+        '401': 'API Key 无效或已过期，请检查密钥配置',
+        '403': '您的账号没有权限访问该资源',
+        '404': '请求的资源不存在',
+        '429': '请求过于频繁，请稍后再试',
+        '500': '服务器内部错误，请稍后重试',
+        '502': '网关错误，请稍后重试',
+        '503': '服务暂时不可用，请稍后重试',
+        '504': '网关超时，请稍后重试',
+      };
+
+      if (errorMap[status]) {
+        return errorMap[status];
+      }
+
+      if (errorCode === 'invalid_api_key') {
+        return 'API Key 无效，请检查您的密钥';
+      }
+      if (errorCode === 'api_key_expired') {
+        return 'API Key 已过期，请重新获取';
+      }
+      if (errorCode === 'quota_exceeded') {
+        return 'API 调用额度已用完，请稍后再试或升级套餐';
+      }
+      if (errorCode === 'rate_limit_exceeded') {
+        return '请求过于频繁，请稍后重试';
+      }
+      if (errorCode === 'model_not_found') {
+        return '模型不存在或不可用';
+      }
+
+      return errorMsg;
+    }
+
+    function getFriendlyErrorMessage(error) {
+      if (error.name === 'AbortError') {
+        return '请求超时了，网络可能不太稳定，请稍后重试';
+      }
+      if (error.name === 'TypeError') {
+        if (error.message.includes('Failed to fetch') ||
+            error.message.includes('NetworkError')) {
+          return '网络连接失败，请检查网络后重试';
+        }
+        if (error.message.includes('CORS')) {
+          return '跨域请求被阻止，请检查网络设置';
+        }
+      }
+      return error.message || '发生未知错误，请稍后重试';
+    }
+
+    // ============================================================
+    //  事件监听
+    // ============================================================
+    document.getElementById('chat-send').addEventListener('click', () => {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      if (message) {
+        input.value = '';
+        callAI(message);
+      }
+    });
+
+    document.getElementById('chat-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const message = e.target.value.trim();
+        if (message) {
+          e.target.value = '';
+          callAI(message);
+        }
+      }
+    });
+
+    // ============================================================
+    //  初始化
+    // ============================================================
+    testAnimal('cat');
+  </script>
+</body>
+</html>

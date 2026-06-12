@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -12,14 +12,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
   <style>
     /* ========== 主题变量（可换肤） ========== */
-    /* --ink: 边框/分割线/标题/正文等"巧克力色"；--shadow: 硬阴影色 */
     :root {
       --ink: #5D4037;
-      --ink-soft: #c8b97a;   /* 次级分割线/虚线/滚动条 */
-      --shadow: #C8B97A;     /* 硬阴影 */
-      --note-bg: #FFF9C4;    /* 便利贴默认底色（由 JS 覆盖） */
-      --panel: var(--panel);      /* 内层面板/任务框底色 */
-      --panel-alt: var(--panel-alt);  /* 任务隔行底色 */
+      --ink-soft: #c8b97a;
+      --shadow: #C8B97A;
+      --note-bg: #FFF9C4;
+      --panel: var(--panel);
+      --panel-alt: var(--panel-alt);
     }
 
     /* ========== 全局 ========== */
@@ -43,13 +42,12 @@
       width: 420px;
       background: #FFF9C4;
       border: 3px solid var(--ink);
-      border-radius: 0;                 /* 像素风：无圆角 */
-      box-shadow: 6px 6px 0 var(--shadow);    /* 硬阴影 */
+      border-radius: 0;
+      box-shadow: 6px 6px 0 var(--shadow);
       padding: 0;
       user-select: none;
       transition: opacity 0.1s;
       image-rendering: pixelated;
-      /* 折角效果 */
       --corner-size: 26px;
       clip-path: polygon(
         0 0,
@@ -119,6 +117,7 @@
       width: 72px;
       flex-shrink: 0;
       text-align: center;
+      position: relative;
     }
     #pet-display {
       width: 64px;
@@ -129,7 +128,7 @@
       justify-content: center;
       font-size: 40px;
       line-height: 1;
-      background: transparent;     /* 完全透明 */
+      background: transparent;
       cursor: pointer;
       image-rendering: pixelated;
       transition: transform 0.15s;
@@ -150,9 +149,28 @@
     }
     #pet-name {
       display: block;
-      margin-top: 5px;
       font-size: 8px;
       color: var(--ink);
+    }
+    .rename-btn {
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      background: #F5E6B8;
+      cursor: pointer;
+      box-shadow: 2px 2px 0 var(--ink);
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.08s;
+    }
+    .rename-btn:hover { background: #FFE082; }
+    .rename-btn:active {
+      box-shadow: none;
+      transform: translate(2px, 2px);
     }
     /* 右侧彩蛋信息 */
     #egg-bar {
@@ -224,6 +242,248 @@
       right: 14px;
       border: 4px solid transparent;
       border-top-color: var(--ink);
+    }
+
+    /* ========== 改名模态框 ========== */
+    #rename-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #rename-modal.show { display: flex; }
+    #rename-box {
+      background: #FFF9C4;
+      border: 3px solid var(--ink);
+      border-radius: 0;
+      padding: 20px 24px;
+      box-shadow: 6px 6px 0 var(--ink);
+      text-align: center;
+      width: 280px;
+    }
+    #rename-box h3 {
+      font-size: 10px;
+      color: var(--ink);
+      margin-bottom: 14px;
+      letter-spacing: 1px;
+    }
+    #rename-input {
+      width: 100%;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      padding: 8px 10px;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      background: #F5E6B8;
+      color: var(--ink);
+      outline: none;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    #rename-input:focus { border-color: #F6A623; }
+    #rename-box .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    /* ========== 小动物菜单 ========== */
+    #pet-menu {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #FFF9C4;
+      border: 3px solid var(--ink);
+      border-radius: 0;
+      padding: 6px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 4px 4px 0 var(--ink);
+      z-index: 50;
+    }
+    #pet-menu.show { display: flex; }
+    #pet-menu button {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 8px 16px;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      cursor: pointer;
+      background: #F5E6B8;
+      color: var(--ink);
+      box-shadow: 2px 2px 0 var(--ink);
+      transition: all 0.08s;
+      text-align: left;
+    }
+    #pet-menu button:hover { background: #FFE082; }
+    #pet-menu button:active {
+      box-shadow: none;
+      transform: translate(2px, 2px);
+    }
+    #pet-menu button.comfort-btn { background: #F8BBD0; }
+
+    /* ========== AI 聊天面板 ========== */
+    #chat-panel {
+      position: absolute;
+      top: 120px;
+      right: -320px;
+      width: 300px;
+      background: #FFF9C4;
+      border: 3px solid var(--ink);
+      border-radius: 0;
+      box-shadow: 6px 6px 0 var(--shadow);
+      display: none;
+      flex-direction: column;
+      z-index: 100;
+      image-rendering: pixelated;
+    }
+    #chat-panel.show { display: flex; }
+    #chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--ink);
+      color: #FFF9C4;
+      padding: 8px 10px;
+      font-size: 9px;
+    }
+    #chat-header .pet-emoji { font-size: 14px; }
+    #chat-close {
+      background: none;
+      border: none;
+      color: #FFF9C4;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 2px;
+    }
+    #chat-messages {
+      flex: 1;
+      height: 240px;
+      overflow-y: auto;
+      padding: 10px;
+      background: var(--panel);
+    }
+    #chat-messages::-webkit-scrollbar { width: 6px; }
+    #chat-messages::-webkit-scrollbar-thumb { background: var(--ink-soft); border-radius: 0; }
+    .chat-message {
+      margin-bottom: 10px;
+      display: flex;
+      gap: 8px;
+    }
+    .chat-message.user { flex-direction: row-reverse; }
+    .chat-message.user .chat-bubble {
+      background: #E3F2FD;
+      border-color: #5D4037;
+      align-self: flex-end;
+    }
+    .chat-message.assistant { flex-direction: row; }
+    .chat-message.assistant .chat-bubble {
+      background: #F5E6B8;
+      border-color: #5D4037;
+      align-self: flex-start;
+    }
+    .chat-avatar {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .chat-bubble {
+      max-width: 75%;
+      padding: 8px 10px;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      font-size: 8px;
+      line-height: 1.6;
+      word-break: break-all;
+    }
+    .chat-typing {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      font-size: 8px;
+      color: #795548;
+    }
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      background: #795548;
+      border-radius: 0;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typing {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    #chat-input-area {
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      border-top: 2px solid var(--ink);
+    }
+    #chat-input {
+      flex: 1;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 6px 8px;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      background: #fff;
+      color: #4e342e;
+      outline: none;
+    }
+    #chat-send {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 6px 10px;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      cursor: pointer;
+      background: #FFE082;
+      color: var(--ink);
+      box-shadow: 2px 2px 0 var(--ink);
+      transition: all 0.08s;
+    }
+    #chat-send:active {
+      box-shadow: none;
+      transform: translate(2px, 2px);
+    }
+    #chat-error {
+      padding: 8px 10px;
+      background: #ffebee;
+      border-top: 2px solid #c62828;
+      font-size: 7px;
+      color: #c62828;
+      display: none;
+    }
+    #chat-error.show { display: block; }
+    #chat-footer {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      background: #FFF9C4;
+      border-top: 1px dashed var(--ink-soft);
+    }
+    #chat-footer .pixel-btn {
+      font-size: 7px;
+      padding: 3px 6px;
+      background: #E8F5E9;
+      border: 1px solid var(--ink);
+      cursor: pointer;
+    }
+    #chat-footer .pixel-btn:hover {
+      background: #C8E6C9;
     }
 
     /* ========== 孵化动画 ========== */
@@ -304,7 +564,6 @@
     }
     .task-item:last-child { border-bottom: none; }
     .task-item:nth-child(even) { background: var(--panel-alt); }
-    /* 方形像素复选框 */
     .task-item input[type="checkbox"] {
       -webkit-appearance: none;
       appearance: none;
@@ -377,7 +636,6 @@
       margin-bottom: 12px;
     }
     #bottom-bar .pixel-btn { flex: 1; }
-    /* 自定义鼓励语：紧挨缓一缓的小方形按钮 */
     #open-encourage {
       flex: 0 0 auto;
       width: 44px;
@@ -702,6 +960,16 @@
         top: 20px !important;
         position: relative;
       }
+      #chat-panel {
+        position: fixed !important;
+        top: auto !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 70vh !important;
+        z-index: 500 !important;
+      }
       body { display: flex; justify-content: center; }
     }
   </style>
@@ -710,9 +978,6 @@
 
 <!-- 便利贴 -->
 <div id="sticky">
-  <!-- 折角 pseudo-element via CSS -->
-
-  <!-- 头部（深褐色条） -->
   <div id="header">
     <h1>慢慢贴</h1>
     <div style="display:flex;gap:4px">
@@ -723,17 +988,22 @@
   </div>
 
   <div id="sticky-body">
-    <!-- 颜色选择器弹出层 -->
     <div id="color-picker-popup"></div>
 
     <!-- 彩蛋 / 小动物面板 -->
     <div id="pet-panel">
-      <!-- 左：像素动物方框 -->
       <div id="pet-box">
         <div id="pet-display" class="empty" title="点击互动"></div>
-        <span id="pet-name"></span>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+          <span id="pet-name"></span>
+          <button id="rename-btn" class="rename-btn" title="改名" style="display:none">✏️</button>
+        </div>
+        <!-- 小动物菜单 -->
+        <div id="pet-menu">
+          <button id="menu-chat">💬 陪我聊聊天</button>
+          <button id="menu-comfort" class="comfort-btn">🤗 安慰我一下</button>
+        </div>
       </div>
-      <!-- 右：彩蛋信息 + 孵化 -->
       <div id="egg-bar">
         <div id="egg-line">
           <img class="egg-img" src="assets/eggs/egg_plain.png" alt="蛋" />
@@ -744,13 +1014,11 @@
       </div>
     </div>
 
-    <!-- 兼容旧逻辑的隐藏区 -->
     <div id="pet-zone"></div>
     <div id="bubble"></div>
 
     <!-- 任务清单标题条 -->
     <div id="task-head"><span class="sq"></span>任务清单</div>
-    <!-- 任务列表 -->
     <ul id="task-list"></ul>
 
     <!-- 添加任务 -->
@@ -766,14 +1034,42 @@
       <button class="pixel-btn" id="open-encourage" title="✏️ 自定义鼓励语 — 写下你想听的话">✏️</button>
     </div>
 
-    <!-- 分隔虚线 -->
     <hr id="divider" />
 
-    <!-- 页脚 -->
     <div id="footer">不着急，慢慢贴，能写下来已经很棒了。</div>
 
-    <!-- 打开桌宠助手 -->
     <button id="open-pet-helper">🐾 打开桌宠助手</button>
+  </div>
+</div>
+
+<!-- 改名模态框 -->
+<div id="rename-modal">
+  <div id="rename-box">
+    <h3>给小动物改名</h3>
+    <input id="rename-input" type="text" placeholder="输入新名字" maxlength="12" />
+    <div class="btn-row">
+      <button class="pixel-btn primary" id="rename-confirm">确定</button>
+      <button class="pixel-btn" id="rename-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 聊天面板 -->
+<div id="chat-panel">
+  <div id="chat-header">
+    <span class="pet-emoji">🐱</span>
+    <span>慢慢陪你聊</span>
+    <button id="chat-close">✕</button>
+  </div>
+  <div id="chat-messages"></div>
+  <div id="chat-input-area">
+    <input id="chat-input" type="text" placeholder="说点什么..." maxlength="200" />
+    <button id="chat-send">发送</button>
+  </div>
+  <div id="chat-error"></div>
+  <div id="chat-footer">
+    <button id="btn-notify" class="pixel-btn" style="font-size:8px;padding:4px 8px;" onclick="requestNotificationPermission()">🔔 允许通知</button>
+    <span style="font-size:8px;color:#999;margin-left:8px;">支持设置提醒哦~</span>
   </div>
 </div>
 
@@ -842,28 +1138,24 @@
 //  常量与数据
 // ============================================================
 const ANIMALS = [
-  { emoji: '🐱', name: '小咪',   img: 'assets/pets/cat.png' },
-  { emoji: '🐶', name: '小汪',   img: 'assets/pets/dog.png' },
-  { emoji: '🐰', name: '小兔兔', img: 'assets/pets/rabbit.png' },
-  { emoji: '🐍', name: '小蛇蛇', img: 'assets/pets/snake.png' },
-  { emoji: '🐹', name: '仓鼠球', img: 'assets/pets/hamster.png' },
-  { emoji: '🦊', name: '小狐',   img: 'assets/pets/fox.png' },
-  { emoji: '🐻', name: '小熊熊', img: 'assets/pets/bear.png' },
-  { emoji: '🦝', name: '小浣熊', img: 'assets/pets/redpanda.png' },
+  { emoji: '🐱', name: '小咪',   img: 'assets/pets/cat.png',     type: 'cat' },
+  { emoji: '🐶', name: '小汪',   img: 'assets/pets/dog.png',     type: 'dog' },
+  { emoji: '🐰', name: '小兔兔', img: 'assets/pets/rabbit.png',  type: 'rabbit' },
+  { emoji: '🐍', name: '小蛇蛇', img: 'assets/pets/snake.png',   type: 'snake' },
+  { emoji: '🦊', name: '小狐',   img: 'assets/pets/fox.png',     type: 'fox' },
+  { emoji: '🐻', name: '小熊熊', img: 'assets/pets/bear.png',    type: 'bear' },
+  { emoji: '🦝', name: '小浣熊', img: 'assets/pets/redpanda.png', type: 'raccoon' },
 ];
 
-// 蛋图片：彩蛋计数用普通蛋，孵化动画用蛋壳序列
 const EGG_IMG = {
   plain:   'assets/eggs/egg_plain.png',
   rainbow: 'assets/eggs/egg_rainbow.png',
   heart:   'assets/eggs/egg_heart.png',
-  blue:    'assets/eggs/egg_blue.png',   // 裂开（蓝）
-  green:   'assets/eggs/egg_green.png',  // 裂开（绿）
+  blue:    'assets/eggs/egg_blue.png',
+  green:   'assets/eggs/egg_green.png',
 };
-// 孵化时随机用一种"裂开"蛋壳
 const CRACKED_EGGS = [EGG_IMG.blue, EGG_IMG.green];
 
-// 兼容旧存档：根据 emoji 或名称找回对应的像素图片
 function resolvePetImg(item) {
   const hit = ANIMALS.find(a => a.emoji === item.emoji || a.name === item.name);
   return hit ? hit.img : null;
@@ -908,37 +1200,277 @@ const LS = {
 };
 
 // ============================================================
+//  AI 对话配置
+// ============================================================
+const AI_CONFIG = {
+  apiKey: '4106f7636b41474993e11c076149145d.pbomVyWJBgiYRS0q',
+  apiUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+  model: 'glm-4',
+  maxHistory: 10,
+  temperature: 0.8,
+};
+
+// ============================================================
+//  动物类型映射表
+// ============================================================
+const animalTypeMap = {
+  cat: '小猫',
+  dog: '小狗',
+  bear: '小熊',
+  rabbit: '小兔',
+  fox: '小狐狸',
+  hamster: '小仓鼠',
+  snake: '小蛇',
+  raccoon: '小浣熊',
+};
+
+// ============================================================
+//  性格映射表
+// ============================================================
+const personalityMap = {
+  cat: '你是一只温柔的小猫，有时有点小傲娇，说话轻声细语。',
+  dog: '你是一只活泼的小狗，总是充满热情，喜欢用感叹号和肢体语言。',
+  bear: '你是一只憨厚的小熊，说话慢悠悠的，很温暖，有时候有点迷糊。',
+  rabbit: '你是一只害羞的小兔，容易脸红，说话声音很小，总是用"那个……"开头。',
+  fox: '你是一只聪明的小狐狸，有点小机灵，喜欢开玩笑但不过分。',
+  hamster: '你是一只圆滚滚的小仓鼠，说话快快的，总惦记着瓜子。',
+  snake: '你是一只安静的小蛇，说话慢条斯理，有时候会给建议。',
+  raccoon: '你是一只呆萌的小浣熊，软软的，说话有点慢，喜欢陪在用户身边。',
+};
+
+// ============================================================
+//  自定义名字存储
+// ============================================================
+function getPetNames() {
+  return LS.get('petNames', {});
+}
+
+function savePetNames(petNames) {
+  LS.set('petNames', petNames);
+}
+
+function getPetName(animalType) {
+  const petNames = getPetNames();
+  if (petNames[animalType]) {
+    return petNames[animalType];
+  }
+  return animalTypeMap[animalType] || '小动物';
+}
+
+function setPetName(animalType, name) {
+  const petNames = getPetNames();
+  petNames[animalType] = name;
+  savePetNames(petNames);
+}
+
+// ============================================================
 //  状态
 // ============================================================
 let tasks     = LS.get('sl_tasks', []);
 let eggs      = LS.get('sl_eggs', 0);
-let currentPet = LS.get('sl_pet', null);   // { emoji, name }
-let collection = LS.get('sl_collection', []); // [{ emoji, name, date }]
+let currentPet = LS.get('sl_pet', null);
+let collection = LS.get('sl_collection', []);
 let totalEggs  = LS.get('sl_total_eggs', 0);
-
-// 新增状态
 let stickyColor = LS.get('sl_color', '#FFF9C4');
-// 历史任务记录：{ 'YYYY/M/D': { tasks: [{text,done}], total, done } }
 let taskHistory = LS.get('sl_history', {});
-// 记录上次打开的日期，用于昨日检测
 let lastOpenDate = LS.get('sl_last_date', null);
 const todayStr = new Date().toLocaleDateString('zh-CN');
+let customEncouragements = LS.get('custom_encouragements', []);
 
-// 配色方案：color=便利贴底色；ink=巧克力色（边框/标题/分割线/正文）；shadow=硬阴影
-// panel/panelAlt=内层任务框底色与隔行色（不填则用默认米白）
+// AI 对话状态
+let chatMessages = [];
+let isChatLoading = false;
+
+// ============================================================
+//  petManager：集中管理 currentPet 与 hatchedPets
+// ============================================================
+(function() {
+  const SYNC_KEY = 'sl_pet_sync';   // pet.html 通过此键读取当前宠物
+
+  // ---- 已孵化类型集合（从 collection 推导） ----
+  function getHatchedTypes() {
+    const set = new Set();
+    const col = LS.get('sl_collection', []);
+    const emojiMap = {
+      '🐱': 'cat', '🐶': 'dog', '🐰': 'rabbit', '🐍': 'snake',
+      '🦊': 'fox', '🐻': 'bear', '🦝': 'raccoon', '🐹': 'hamster'
+    };
+    col.forEach(item => {
+      const t = item.type || emojiMap[item.emoji];
+      if (t) set.add(t);
+    });
+    return set;
+  }
+
+  // ---- 从 type 查找 ANIMALS 条目 ----
+  function findAnimalByType(type) {
+    return ANIMALS.find(a => a.type === type);
+  }
+
+  // ---- 从任意 pet 对象推断 type（兼容旧数据） ----
+  function inferType(pet) {
+    if (pet && pet.type) return pet.type;
+    const emojiMap = {
+      '🐱': 'cat', '🐶': 'dog', '🐰': 'rabbit', '🐍': 'snake',
+      '🦊': 'fox', '🐻': 'bear', '🦝': 'raccoon', '🐹': 'hamster'
+    };
+    if (pet && pet.emoji && emojiMap[pet.emoji]) return emojiMap[pet.emoji];
+    return 'cat';
+  }
+
+  function getPersonality(type) {
+    return personalityMap[type] || '';
+  }
+
+  function getDefaultName(type) {
+    return animalTypeMap[type] || '小动物';
+  }
+
+  window.petManager = {
+    // ---- 当前宠物 ----
+    get current() {
+      return currentPet;
+    },
+
+    // ---- 已孵化类型 ----
+    get hatchedTypes() {
+      return getHatchedTypes();
+    },
+
+    // ---- 已孵化动物详情（用于 pet.html 的拾取器） ----
+    get hatchedAnimals() {
+      const types = getHatchedTypes();
+      return [...types].map(t => findAnimalByType(t)).filter(Boolean);
+    },
+
+    // ---- 检查某类型是否已孵化 ----
+    isHatched: function(type) {
+      return getHatchedTypes().has(type);
+    },
+
+    // ---- 设置当前宠物（统一入口） ----
+    // pet 对象需包含 { emoji, name, img?, type }
+    setCurrentPet: function(pet) {
+      if (!pet) return;
+      // 确保有 type
+      if (!pet.type) pet.type = inferType(pet);
+      currentPet = pet;
+      save();
+      // 同步键：供 pet.html 读取
+      LS.set(SYNC_KEY, {
+        emoji: pet.emoji,
+        name: pet.name,
+        img: pet.img || null,
+        type: pet.type,
+        ts: Date.now(),
+      });
+      renderPet();
+      showBubble(`${pet.name} 来陪你了。`, 2500);
+    },
+
+    // ---- 添加已孵化动物并设为当前 ----
+    addHatchedAndSet: function(pet) {
+      if (!pet) return;
+      if (!pet.type) pet.type = inferType(pet);
+      // 加入 collection
+      collection.push({
+        emoji: pet.emoji,
+        name: pet.name,
+        img: pet.img || null,
+        type: pet.type,
+        date: new Date().toLocaleDateString('zh-CN'),
+      });
+      // 设为当前
+      currentPet = pet;
+      save();
+      LS.set(SYNC_KEY, {
+        emoji: pet.emoji,
+        name: pet.name,
+        img: pet.img || null,
+        type: pet.type,
+        ts: Date.now(),
+      });
+      renderPet();
+    },
+
+    // ---- 获取类型中文名 ----
+    getTypeName: function(type) {
+      return animalTypeMap[type || inferType(currentPet)] || '小动物';
+    },
+
+    // ---- 获取自定义名字 ----
+    getName: function() {
+      return getPetName(inferType(currentPet));
+    },
+
+    // ---- 获取性格描述 ----
+    getPersonality: function() {
+      return getPersonality(inferType(currentPet));
+    },
+
+    // ---- 获取默认名 ----
+    getDefaultName: function() {
+      return getDefaultName(inferType(currentPet));
+    },
+
+    // ---- 刷新桌面同步键（外部调用） ----
+    broadcast: function() {
+      if (!currentPet) return;
+      LS.set(SYNC_KEY, {
+        emoji: currentPet.emoji,
+        name: currentPet.name,
+        img: currentPet.img || null,
+        type: currentPet.type || inferType(currentPet),
+        ts: Date.now(),
+      });
+    },
+  };
+
+  // 兼容旧代码：window.pet 委托给 petManager
+  window.pet = {
+    get type() { return inferType(currentPet); },
+    get defaultName() { return getDefaultName(inferType(currentPet)); },
+    getName: function() { return getPetName(inferType(currentPet)); },
+    get personality() { return getPersonality(inferType(currentPet)); },
+    refresh: function() {},
+  };
+
+  // ---- 监听 localStorage 变化（桌宠 pet.html 切换时触发） ----
+  window.addEventListener('storage', function(e) {
+    if (e.key === SYNC_KEY && e.newValue) {
+      try {
+        const data = JSON.parse(e.newValue);
+        if (!data || !data.type) return;
+        // 检查是否已经是当前宠物
+        if (currentPet && currentPet.type === data.type &&
+            currentPet.emoji === data.emoji && currentPet.name === data.name) return;
+        // 检查是否已孵化
+        if (!petManager.isHatched(data.type)) return;
+        // 更新
+        currentPet = currentPet || {};
+        currentPet.emoji = data.emoji;
+        currentPet.name = data.name;
+        currentPet.img = data.img || null;
+        currentPet.type = data.type;
+        save();
+        renderPet();
+      } catch (err) { /* ignore parse errors */ }
+    }
+  });
+})();
+
+// ============================================================
+//  配色方案
+// ============================================================
 const COLOR_PALETTE = [
   { color: '#FFF9C4', label: '淡黄', ink: '#5D4037', shadow: '#C8B97A' },
   { color: '#FCE4EC', label: '淡粉', ink: '#5D4037', shadow: '#e8a0b4' },
   { color: '#E3F2FD', label: '淡蓝', ink: '#5D4037', shadow: '#90c8ef' },
   { color: '#E8F5E9', label: '淡绿', ink: '#5D4037', shadow: '#92c99a' },
   { color: '#EDE7F6', label: '浅紫', ink: '#5D4037', shadow: '#b39ddb' },
-  // 🍫 薄荷巧克力：薄荷底 + 巧克力边框/文字
   { color: '#A8E6CF', label: '薄荷巧克力', ink: '#5D3A1A', shadow: '#6B3E1B',
     panel: '#E6F7EF', panelAlt: '#D2EFE1', inkSoft: '#9C7A55' },
 ];
-
-// 自定义鼓励语（每行一句，存数组）
-let customEncouragements = LS.get('custom_encouragements', []);
 
 // ============================================================
 //  DOM 引用
@@ -948,6 +1480,7 @@ const eggCount   = document.getElementById('egg-count');
 const hatchBtn   = document.getElementById('hatch-btn');
 const petDisplay = document.getElementById('pet-display');
 const petName    = document.getElementById('pet-name');
+const petMenu    = document.getElementById('pet-menu');
 const bubble     = document.getElementById('bubble');
 const taskList   = document.getElementById('task-list');
 const newInput   = document.getElementById('new-task-input');
@@ -961,7 +1494,6 @@ const collModal  = document.getElementById('collection-modal');
 const openCollBtn = document.getElementById('open-coll');
 const closeCollBtn = document.getElementById('close-coll');
 
-// 新增 DOM 引用
 const openColorBtn   = document.getElementById('open-color');
 const colorPickerPop = document.getElementById('color-picker-popup');
 const openHistoryBtn = document.getElementById('open-history');
@@ -973,6 +1505,22 @@ const pwaBanner      = document.getElementById('pwa-banner');
 const pwaInstallBtn  = document.getElementById('pwa-install-btn');
 const pwaDismissBtn  = document.getElementById('pwa-dismiss-btn');
 
+// 改名功能 DOM
+const renameBtn      = document.getElementById('rename-btn');
+const renameModal    = document.getElementById('rename-modal');
+const renameInput    = document.getElementById('rename-input');
+const renameConfirm  = document.getElementById('rename-confirm');
+const renameCancel   = document.getElementById('rename-cancel');
+
+// AI 聊天 DOM
+const chatPanel    = document.getElementById('chat-panel');
+const chatMessagesDiv = document.getElementById('chat-messages');
+const chatInput    = document.getElementById('chat-input');
+const chatSend     = document.getElementById('chat-send');
+const chatClose    = document.getElementById('chat-close');
+const chatError    = document.getElementById('chat-error');
+const chatHeaderEmoji = document.querySelector('#chat-header .pet-emoji');
+
 // ============================================================
 //  保存函数
 // ============================================================
@@ -982,7 +1530,6 @@ function save() {
   LS.set('sl_pet', currentPet);
   LS.set('sl_collection', collection);
   LS.set('sl_total_eggs', totalEggs);
-  // 每次保存时更新今日历史快照
   taskHistory[todayStr] = {
     tasks: tasks.map(t => ({ text: t.text, done: t.done })),
     total: tasks.length,
@@ -998,7 +1545,6 @@ function applyColor(hex) {
   stickyColor = hex;
   const palette = COLOR_PALETTE.find(c => c.color === hex) || COLOR_PALETTE[0];
   const root = document.documentElement;
-  // 切换主题变量：底色 / 巧克力色 / 硬阴影
   root.style.setProperty('--note-bg', palette.color);
   root.style.setProperty('--ink', palette.ink || '#5D4037');
   root.style.setProperty('--ink-soft', palette.inkSoft || palette.shadow || '#c8b97a');
@@ -1006,7 +1552,6 @@ function applyColor(hex) {
   root.style.setProperty('--panel', palette.panel || '#FFFDEB');
   root.style.setProperty('--panel-alt', palette.panelAlt || '#F5EDC0');
   sticky.style.background = palette.color;
-  // 折角伪元素背景与便利贴同色（边框由 --ink 形成折痕）
   let s = document.getElementById('corner-style');
   if (!s) { s = document.createElement('style'); s.id = 'corner-style'; document.head.appendChild(s); }
   s.textContent = `#sticky::before { background: ${palette.color} !important; }`;
@@ -1023,7 +1568,7 @@ function buildColorPicker() {
     dot.addEventListener('click', (e) => {
       e.stopPropagation();
       applyColor(p.color);
-      buildColorPicker(); // 刷新高亮
+      buildColorPicker();
       colorPickerPop.classList.remove('show');
     });
     colorPickerPop.appendChild(dot);
@@ -1035,7 +1580,6 @@ openColorBtn.addEventListener('click', (e) => {
   buildColorPicker();
   colorPickerPop.classList.toggle('show');
 });
-// 点击便利贴外部关闭颜色选择器
 document.addEventListener('click', () => colorPickerPop.classList.remove('show'));
 
 // ============================================================
@@ -1065,40 +1609,631 @@ function showBubble(text, duration = 2500) {
 }
 
 // ============================================================
+//  小动物菜单
+// ============================================================
+function togglePetMenu() {
+  if (!currentPet) return;
+  petMenu.classList.toggle('show');
+}
+
+function closePetMenu() {
+  petMenu.classList.remove('show');
+}
+
+document.addEventListener('click', (e) => {
+  if (!petMenu.contains(e.target) && e.target !== petDisplay) {
+    closePetMenu();
+  }
+});
+
+// ============================================================
 //  小动物
 // ============================================================
 function renderPet() {
   if (currentPet) {
     if (currentPet.img) {
-      // 用像素图片；加载失败时回退到 emoji
       petDisplay.innerHTML =
         `<img src="${currentPet.img}" alt="${currentPet.name}" ` +
         `onerror="this.parentNode.textContent='${currentPet.emoji}'">`;
     } else {
       petDisplay.textContent = currentPet.emoji;
     }
-    petName.textContent = currentPet.name;
+    // 使用 window.pet 获取当前动物的自定义名字
+    petName.textContent = window.pet.getName();
     petDisplay.classList.remove('empty');
     petDisplay.classList.add('pet-float');
+    // 更新聊天面板的小动物 emoji
+    chatHeaderEmoji.textContent = currentPet.emoji;
+    // 显示改名按钮
+    renameBtn.style.display = 'block';
   } else {
     petDisplay.innerHTML = '';
     petDisplay.textContent = '？';
     petName.textContent = '空空的';
     petDisplay.classList.add('empty');
     petDisplay.classList.remove('pet-float', 'pet-jump', 'pet-shake');
+    chatHeaderEmoji.textContent = '🐱';
+    // 隐藏改名按钮
+    renameBtn.style.display = 'none';
   }
 }
 
-petDisplay.addEventListener('click', () => {
+petDisplay.addEventListener('click', (e) => {
+  e.stopPropagation();
   if (!currentPet) return;
-  triggerPetJump(); // 点击触发跳跃
-  const msg = PET_TALK[Math.floor(Math.random() * PET_TALK.length)](currentPet.name);
-  showBubble(msg);
-  // 20% 概率额外送彩蛋
-  if (Math.random() < 0.2) {
-    addEgg(1);
-    setTimeout(() => showBubble(`🥚 ${currentPet.name} 偷偷放了一颗彩蛋！`, 2500), 2600);
+  if (petMenu.classList.contains('show')) {
+    closePetMenu();
+  } else {
+    togglePetMenu();
+    triggerPetJump();
   }
+});
+
+// ============================================================
+//  改名功能
+// ============================================================
+renameBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  renameInput.value = window.pet.getName();
+  renameModal.classList.add('show');
+  renameInput.focus();
+});
+
+renameCancel.addEventListener('click', () => {
+  renameModal.classList.remove('show');
+});
+
+renameModal.addEventListener('click', (e) => {
+  if (e.target === renameModal) {
+    renameModal.classList.remove('show');
+  }
+});
+
+renameConfirm.addEventListener('click', () => {
+  const newName = renameInput.value.trim();
+  if (!newName || newName.length > 12) {
+    showBubble('名字长度需要在1-12个字符之间哦~', 2500);
+    return;
+  }
+  
+  const animalType = window.pet.type;
+  setPetName(animalType, newName);
+  petName.textContent = newName;
+  renameModal.classList.remove('show');
+  showBubble(`名字改成「${newName}」啦！`, 2500);
+});
+
+renameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    renameConfirm.click();
+  }
+});
+
+// ============================================================
+//  AI 对话功能
+// ============================================================
+function getSystemPrompt() {
+  const animalType = window.pet.type;
+  const animalTypeName = animalTypeMap[animalType] || '小动物';
+  const petName = window.pet.getName();
+  const personality = window.pet.personality;
+  
+  return `${personality}你是一只${animalTypeName}，名字叫${petName}。你喜欢和用户聊天，语气自然温暖，像朋友一样。每次回复不要重复相同的话。`;
+}
+
+function buildMessages() {
+  const messages = [{ role: 'system', content: getSystemPrompt() }];
+  chatMessages.forEach(msg => {
+    messages.push({ role: msg.role, content: msg.content });
+  });
+  return messages;
+}
+
+// ============================================================
+//  本地提醒功能
+// ============================================================
+
+// 提醒日志工具
+function logReminder(type, message, data = null) {
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().padStart(3,'0')}`;
+  const prefix = `%c[提醒] ${timeStr}`;
+  const colors = {
+    'INFO': 'color: #2196F3',
+    'SUCCESS': 'color: #4CAF50',
+    'WARNING': 'color: #ff9800',
+    'ERROR': 'color: #f44336',
+    'TRIGGER': 'color: #9c27b0',
+  };
+  const color = colors[type] || 'color: #333';
+  if (data) {
+    console.log(`${prefix} %c${message}`, 'color: #888', color, data);
+  } else {
+    console.log(`${prefix} %c${message}`, 'color: #888', color);
+  }
+}
+
+// 提醒正则：匹配 "提醒我X分钟后..." 或 "X分钟后提醒我..."
+const REMINDER_PATTERNS = [
+  /提醒我(\d+)\s*分钟(?:后)?\s*(.+)?/,
+  /(\d+)\s*分钟(?:后)?\s*提醒我\s*(.+)?/,
+  /(\d+)分钟后/,
+  /^(\d+)\s*分钟后\s*(.+)/,
+];
+
+// 检测用户输入是否包含提醒指令
+function parseReminder(text) {
+  logReminder('INFO', `解析输入: "${text}"`);
+  for (const pattern of REMINDER_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) {
+      let minutes = null;
+      let content = '';
+      
+      if (pattern.source.startsWith('提醒我')) {
+        // 格式：提醒我X分钟(后)...(内容)
+        minutes = parseInt(match[1], 10);
+        content = match[2] ? match[2].trim() : '';
+      } else if (pattern.source.includes('分钟(?:后)?')) {
+        // 格式：X分钟(后)提醒我...
+        minutes = parseInt(match[1], 10);
+        content = match[2] ? match[2].trim() : '';
+      }
+      
+      if (minutes && minutes > 0 && minutes <= 1440) { // 最多24小时
+        logReminder('SUCCESS', `匹配成功: ${minutes}分钟, 内容: "${content}"`);
+        return { minutes, content };
+      }
+    }
+  }
+  logReminder('INFO', '未匹配到提醒格式，将调用AI处理');
+  return null;
+}
+
+// 显示小动物的提醒确认消息
+function showReminderConfirm(minutes, content) {
+  const petEmoji = currentPet?.emoji || '🐱';
+  const petName = petManager ? petManager.getName() : (currentPet?.name || '小动物');
+  
+  let confirmText = `好的，我会在 ${minutes} 分钟后提醒你`;
+  if (content) {
+    confirmText += `：${content}`;
+  } else {
+    confirmText += '哦~';
+  }
+  
+  // 添加助手消息
+  chatMessages.push({ role: 'assistant', content: `${petEmoji} ${confirmText}` });
+  renderChatMessages();
+  
+  // 小动物跳动一下
+  triggerPetJump();
+}
+
+// 显示格式错误的提示
+function showReminderFormatError() {
+  const petEmoji = currentPet?.emoji || '🐱';
+  chatMessages.push({ 
+    role: 'assistant', 
+    content: `${petEmoji} 请告诉我几分钟后提醒我，比如「提醒我5分钟后喝水」或者「5分钟后提醒我开会」~` 
+  });
+  renderChatMessages();
+}
+
+// 执行本地提醒
+function executeReminder(minutes, content) {
+  const delayMs = minutes * 60 * 1000;
+  const petEmoji = currentPet?.emoji || '🐱';
+  const petName = petManager ? petManager.getName() : (currentPet?.name || '小动物');
+  
+  logReminder('INFO', `设置提醒: ${minutes}分钟`);
+  logReminder('INFO', `延迟时间: ${delayMs}ms (${minutes}分钟)`);
+  logReminder('INFO', `当前宠物: ${petName} (${petEmoji})`);
+  
+  // 移除"提醒我"等前缀，获取纯内容
+  let reminderContent = content;
+  if (!reminderContent) {
+    reminderContent = `${petName}提醒你：该休息一下啦！`;
+  } else {
+    reminderContent = `${petName}提醒你：${reminderContent}`;
+  }
+  logReminder('INFO', `提醒内容: "${reminderContent}"`);
+  
+  // 设置定时器
+  setTimeout(() => {
+    logReminder('TRIGGER', `⏰ 提醒触发！时间到！`);
+    logReminder('INFO', `准备发送通知，内容: "${reminderContent}"`);
+    
+    triggerPetJump();
+    
+    // 检查浏览器是否支持通知
+    if (!('Notification' in window)) {
+      logReminder('WARNING', '浏览器不支持 Notification API，将使用 confirm() 作为 Fallback');
+      logReminder('INFO', '手机端浏览器检测：使用 alert 弹窗');
+      // 手机端或不支持通知的浏览器，使用 alert
+      alert(`${petEmoji} ${reminderContent}`);
+      logReminder('SUCCESS', 'Alert 弹窗已显示');
+      return;
+    }
+    
+    logReminder('INFO', `Notification 支持状态: 支持`);
+    logReminder('INFO', `当前通知权限: ${Notification.permission}`);
+    
+    // 检查通知权限
+    if (Notification.permission === 'granted') {
+      logReminder('SUCCESS', '权限已授权，发送通知...');
+      // 已有权限，直接发送通知
+      try {
+        logReminder('INFO', '尝试创建带 requireInteraction 的通知...');
+        const notification = new Notification('慢慢贴提醒 ⏰', {
+          body: reminderContent,
+          icon: currentPet?.img || 'assets/icon.png',
+          tag: 'reminder', // 防止重复通知
+          requireInteraction: true, // 保持通知直到用户操作
+        });
+        
+        notification.onclick = () => {
+          logReminder('INFO', '用户点击了通知');
+          window.focus();
+          notification.close();
+        };
+        
+        logReminder('SUCCESS', `✓ 通知已发送: "${reminderContent}"`);
+        
+        // 5秒后自动关闭
+        setTimeout(() => {
+          notification.close();
+          logReminder('INFO', '通知已自动关闭');
+        }, 5000);
+      } catch (e) {
+        logReminder('WARNING', `高级通知创建失败: ${e.message}，尝试简单版本`);
+        // 某些浏览器可能不支持某些选项，使用简单版本
+        try {
+          const notification = new Notification('慢慢贴提醒 ⏰', {
+            body: reminderContent,
+            icon: currentPet?.img || 'assets/icon.png',
+          });
+          logReminder('SUCCESS', `✓ 简单通知已发送`);
+        } catch (e2) {
+          logReminder('ERROR', `通知创建失败: ${e2.message}`);
+        }
+      }
+    } else if (Notification.permission !== 'denied') {
+      logReminder('WARNING', '权限尚未授权，请求权限...');
+      // 尚未请求权限，先请求
+      Notification.requestPermission().then(permission => {
+        logReminder('INFO', `权限请求结果: ${permission}`);
+        if (permission === 'granted') {
+          logReminder('SUCCESS', '权限已授权，重新执行提醒');
+          executeReminder(minutes, content); // 重新执行
+        } else {
+          logReminder('WARNING', '权限被拒绝，使用 alert');
+          alert(`${petEmoji} ${reminderContent}`);
+        }
+      });
+    } else {
+      logReminder('WARNING', '权限已被拒绝，使用 alert');
+      alert(`${petEmoji} ${reminderContent}`);
+    }
+  }, delayMs);
+  
+  logReminder('SUCCESS', `✓ 定时器已设置，将于 ${minutes} 分钟后触发`);
+}
+
+// 请求通知权限（可选，用户可主动触发）
+function requestNotificationPermission() {
+  logReminder('INFO', '请求通知权限');
+  
+  if (!('Notification' in window)) {
+    logReminder('WARNING', '浏览器不支持 Notification API');
+    showBubble('您的浏览器不支持通知功能', 3000);
+    return false;
+  }
+  
+  logReminder('INFO', `当前通知权限: ${Notification.permission}`);
+  
+  if (Notification.permission === 'granted') {
+    logReminder('SUCCESS', '权限已授权');
+    showBubble('通知权限已开启 ✓', 2000);
+    return true;
+  }
+  
+  if (Notification.permission === 'denied') {
+    logReminder('WARNING', '权限已被拒绝');
+    showBubble('通知权限已被拒绝，请在浏览器设置中开启', 3000);
+    return false;
+  }
+  
+  // 请求权限
+  logReminder('INFO', '正在请求通知权限...');
+  Notification.requestPermission().then(permission => {
+    logReminder('INFO', `权限请求结果: ${permission}`);
+    if (permission === 'granted') {
+      logReminder('SUCCESS', '权限已授权');
+      showBubble('已开启通知权限 ✓', 2000);
+    } else {
+      logReminder('WARNING', '权限请求被拒绝');
+      showBubble('通知权限请求被拒绝', 2000);
+    }
+  });
+  return null;
+}
+
+// 检查并返回是否应该继续调用AI
+function checkAndHandleReminder(text) {
+  logReminder('INFO', `检查输入: "${text}"`);
+  
+  // 检查是否是提醒指令
+  const reminder = parseReminder(text);
+  
+  if (reminder) {
+    // 成功解析到提醒
+    if (!reminder.content || reminder.content.length < 1) {
+      // 没有提醒内容，提示用户
+      logReminder('WARNING', '提醒格式不完整，缺少内容');
+      showReminderFormatError();
+      return false; // 不调用AI
+    }
+    
+    logReminder('SUCCESS', '准备设置提醒，不调用AI');
+    // 显示确认消息
+    showReminderConfirm(reminder.minutes, reminder.content);
+    
+    // 执行提醒
+    executeReminder(reminder.minutes, reminder.content);
+    
+    return false; // 不调用AI
+  }
+  
+  // 检查是否是格式错误的提醒（如"提醒我喝水"没有时间）
+  if (/^提醒我[^\d]+$/.test(text) || /提醒我(.+)/.test(text) && !/\d/.test(text)) {
+    if (text.includes('提醒')) {
+      logReminder('WARNING', '输入包含"提醒"但缺少时间');
+      showReminderFormatError();
+      return false;
+    }
+  }
+  
+  logReminder('INFO', '不是提醒指令，将调用AI处理');
+  return true; // 继续调用AI
+}
+
+async function callAI(message) {
+  if (isChatLoading) return;
+  
+  // ★★★ 在发送消息给 AI 之前，先检查是否是提醒指令 ★★★
+  if (!checkAndHandleReminder(message)) {
+    // 如果是提醒指令，已经处理完毕，不需要调用 AI
+    isChatLoading = false;
+    return;
+  }
+  
+  isChatLoading = true;
+  showChatLoading(true);
+  hideChatError();
+  
+  // 添加用户消息
+  chatMessages.push({ role: 'user', content: message });
+  
+  // 保持最近 10 轮对话
+  if (chatMessages.length > AI_CONFIG.maxHistory * 2) {
+    chatMessages = chatMessages.slice(-AI_CONFIG.maxHistory * 2);
+  }
+  
+  renderChatMessages();
+  
+  try {
+    // 创建超时控制器
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 30000); // 30秒超时
+    
+    const response = await fetch(AI_CONFIG.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AI_CONFIG.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: AI_CONFIG.model,
+        messages: buildMessages(),
+        temperature: AI_CONFIG.temperature,
+        max_tokens: 500,
+      }),
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new Error('服务器返回的数据格式有误，请稍后重试');
+    }
+    
+    if (!response.ok) {
+      const errorMsg = parseApiError(data, response.status);
+      throw new Error(errorMsg);
+    }
+    
+    const reply = data.choices?.[0]?.message?.content || '我不太明白你说的话呢...';
+    
+    chatMessages.push({ role: 'assistant', content: reply });
+    
+    // 保持最近 10 轮对话
+    if (chatMessages.length > AI_CONFIG.maxHistory * 2) {
+      chatMessages = chatMessages.slice(-AI_CONFIG.maxHistory * 2);
+    }
+    
+    renderChatMessages();
+    triggerPetJump();
+    
+  } catch (error) {
+    const friendlyMsg = getFriendlyErrorMessage(error);
+    showChatError(friendlyMsg);
+    // 移除刚才添加的用户消息（因为没有成功发送）
+    chatMessages.pop();
+    renderChatMessages();
+  } finally {
+    isChatLoading = false;
+    showChatLoading(false);
+  }
+}
+
+// 解析 API 错误响应
+function parseApiError(data, status) {
+  const errorCode = data.error?.code;
+  const errorMsg = data.error?.message || data.message || '未知错误';
+  
+  // 常见的智谱 API 错误码处理
+  const errorMap = {
+    '401': 'API Key 无效或已过期，请检查密钥配置',
+    '403': '您的账号没有权限访问该资源',
+    '404': '请求的资源不存在',
+    '429': '请求过于频繁，请稍后再试',
+    '500': '服务器内部错误，请稍后重试',
+    '502': '网关错误，请稍后重试',
+    '503': '服务暂时不可用，请稍后重试',
+    '504': '网关超时，请稍后重试',
+  };
+  
+  if (errorMap[status]) {
+    return errorMap[status];
+  }
+  
+  // 智谱 API 特定错误码
+  if (errorCode === 'invalid_api_key') {
+    return 'API Key 无效，请检查您的密钥';
+  }
+  if (errorCode === 'api_key_expired') {
+    return 'API Key 已过期，请重新获取';
+  }
+  if (errorCode === 'quota_exceeded') {
+    return 'API 调用额度已用完，请稍后再试或升级套餐';
+  }
+  if (errorCode === 'rate_limit_exceeded') {
+    return '请求过于频繁，请稍后再试';
+  }
+  if (errorCode === 'model_not_found') {
+    return '模型不存在或不可用';
+  }
+  
+  return errorMsg;
+}
+
+// 获取友好的错误提示信息
+function getFriendlyErrorMessage(error) {
+  if (error.name === 'AbortError') {
+    return '请求超时了，网络可能不太稳定，请稍后重试';
+  }
+  if (error.name === 'TypeError') {
+    // 网络连接错误
+    if (error.message.includes('Failed to fetch') || 
+        error.message.includes('NetworkError')) {
+      return '网络连接失败，请检查网络后重试';
+    }
+    if (error.message.includes('CORS')) {
+      return '跨域请求被阻止，请检查网络设置';
+    }
+  }
+  return error.message || '发生未知错误，请稍后重试';
+}
+
+function renderChatMessages() {
+  chatMessagesDiv.innerHTML = '';
+  
+  chatMessages.forEach(msg => {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${msg.role}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'chat-avatar';
+    avatar.textContent = msg.role === 'user' ? '👤' : (currentPet?.emoji || '🐱');
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    bubble.textContent = msg.content;
+    
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(bubble);
+    chatMessagesDiv.appendChild(messageDiv);
+  });
+  
+  // 滚动到底部
+  chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+}
+
+function showChatLoading(show) {
+  const typingDiv = document.querySelector('.chat-typing');
+  if (show) {
+    if (!typingDiv) {
+      const newTyping = document.createElement('div');
+      newTyping.className = 'chat-typing';
+      newTyping.innerHTML = '<span>正在输入...</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+      chatMessagesDiv.appendChild(newTyping);
+    }
+    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+  } else {
+    if (typingDiv) {
+      typingDiv.remove();
+    }
+  }
+}
+
+function showChatError(message) {
+  chatError.textContent = message;
+  chatError.classList.add('show');
+}
+
+function hideChatError() {
+  chatError.classList.remove('show');
+}
+
+function openChatPanel(comfortMode = false) {
+  closePetMenu();
+  chatPanel.classList.add('show');
+  hideChatError();
+  
+  // 如果是安慰模式，自动发送安慰请求
+  if (comfortMode) {
+    setTimeout(() => {
+      callAI('我需要安慰，请给我一些温暖的话');
+    }, 300);
+  }
+  
+  // 聚焦输入框
+  setTimeout(() => chatInput.focus(), 200);
+}
+
+function closeChatPanel() {
+  chatPanel.classList.remove('show');
+}
+
+chatSend.addEventListener('click', () => {
+  const text = chatInput.value.trim();
+  if (!text || isChatLoading) return;
+  chatInput.value = '';
+  callAI(text);
+});
+
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    chatSend.click();
+  }
+});
+
+chatClose.addEventListener('click', closeChatPanel);
+
+// 菜单按钮事件
+document.getElementById('menu-chat').addEventListener('click', () => {
+  openChatPanel(false);
+});
+
+document.getElementById('menu-comfort').addEventListener('click', () => {
+  openChatPanel(true);
 });
 
 // ============================================================
@@ -1111,14 +2246,11 @@ hatchBtn.addEventListener('click', () => {
   renderEggs();
 
   const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  // 随机一种裂开蛋壳（蓝/绿）
   const crackedEgg = CRACKED_EGGS[Math.floor(Math.random() * CRACKED_EGGS.length)];
-  // 小工具：在孵化框里放图片，加载失败回退到 emoji
   const setHatchImg = (src, fallback) => {
     hatchAnim.innerHTML = `<img src="${src}" alt="" onerror="this.parentNode.textContent='${fallback}'">`;
   };
 
-  // 动画序列: 完整蛋 → 裂开蛋壳 → 动物
   setHatchImg(EGG_IMG.plain, '🥚');
   hatchMsg.textContent = '正在孵化…';
   hatchOverlay.classList.add('show');
@@ -1130,16 +2262,11 @@ hatchBtn.addEventListener('click', () => {
   }, 1400);
   setTimeout(() => {
     hatchOverlay.classList.remove('show');
-    currentPet = animal;
-    // 加入收集册（记录图片路径）
-    collection.push({ emoji: animal.emoji, name: animal.name, img: animal.img, date: new Date().toLocaleDateString('zh-CN') });
-    save();
-    renderPet();
+    petManager.addHatchedAndSet(animal);
     showBubble(`🎊 欢迎 ${animal.name}！点击它来互动吧~`, 3000);
   }, 2400);
 });
 
-// 点击遮罩不关闭（让动画播完）
 hatchOverlay.addEventListener('click', () => {});
 
 // ============================================================
@@ -1184,17 +2311,14 @@ function addTask() {
 
 function toggleTask(i) {
   if (tasks[i].done) {
-    // 取消勾选
     tasks[i].done = false;
   } else {
     tasks[i].done = true;
-    // 优先使用自定义鼓励语，否则用默认数组
     const pool = customEncouragements.length > 0 ? customEncouragements : ENCOURAGE;
     const msg = pool[Math.floor(Math.random() * pool.length)];
     showBubble(msg);
     addEgg(1);
-    triggerPetJump();  // 任务完成时小动物跳跃
-    // 通知 Agent 检查"庆祝"规则（延迟以让鼓励气泡先显示）
+    triggerPetJump();
     if (typeof agent !== 'undefined') {
       setTimeout(() => agent.onTaskCompleted(), 2700);
     }
@@ -1218,7 +2342,6 @@ newInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); 
 comfortBtn.addEventListener('click', () => {
   const msg = COMFORT[Math.floor(Math.random() * COMFORT.length)];
   showBubble(msg, 3500);
-  // 30% 概率赠彩蛋（心软机制）
   if (Math.random() < 0.3) {
     addEgg(1);
     setTimeout(() => showBubble('🥚 悄悄给你一颗彩蛋，因为你值得', 3000), 4000);
@@ -1226,7 +2349,7 @@ comfortBtn.addEventListener('click', () => {
 });
 
 // ============================================================
-//  顺延（保留未完成任务，不删除）
+//  顺延
 // ============================================================
 deferBtn.addEventListener('click', () => {
   const undone = tasks.filter(t => !t.done).length;
@@ -1238,18 +2361,29 @@ deferBtn.addEventListener('click', () => {
 });
 
 // ============================================================
-//  收集册（网格版，可切换当前小动物）
+//  收集册
 // ============================================================
+// 需要排除的小动物名称
+const EXCLUDED_PETS = ['呱呱', '团团'];
+
 openCollBtn.addEventListener('click', () => {
   document.getElementById('coll-egg-total').textContent = `累计彩蛋：${totalEggs} 🥚`;
   const grid = document.getElementById('coll-grid');
   grid.innerHTML = '';
-  if (collection.length === 0) {
+  
+  // 过滤收集册：只保留已孵化的小动物，排除指定名称
+  const filteredCollection = collection.filter(item => {
+    // 排除呱呱和团团
+    if (EXCLUDED_PETS.includes(item.name)) return false;
+    // 只保留 ANIMALS 中定义的小动物
+    return ANIMALS.some(a => a.emoji === item.emoji || a.name === item.name);
+  });
+  
+  if (filteredCollection.length === 0) {
     grid.innerHTML = '<div style="padding:12px;font-size:8px;color:#a1887f;grid-column:1/-1">还没有小动物，快去孵化吧</div>';
   } else {
-    // 按 emoji+name 去重并统计次数
     const map = {};
-    collection.forEach(item => {
+    filteredCollection.forEach(item => {
       const key = item.emoji + item.name;
       if (!map[key]) map[key] = { ...item, count: 0 };
       map[key].count++;
@@ -1258,7 +2392,6 @@ openCollBtn.addEventListener('click', () => {
       const cell = document.createElement('div');
       const isCurrent = currentPet && currentPet.emoji === item.emoji && currentPet.name === item.name;
       cell.className = 'coll-cell' + (isCurrent ? ' current' : '');
-      // 兼容旧数据：没有 img 时按名称/emoji 回查
       const imgSrc = item.img || resolvePetImg(item);
       const visual = imgSrc
         ? `<img class="cell-img" src="${imgSrc}" alt="${item.name}" onerror="this.outerHTML='<span class=\\'cell-emoji\\'>${item.emoji}</span>'">`
@@ -1268,11 +2401,15 @@ openCollBtn.addEventListener('click', () => {
         <span class="cell-count">×${item.count}</span>`;
       cell.title = isCurrent ? '当前陪伴' : '点击切换陪伴';
       cell.addEventListener('click', () => {
-        currentPet = { emoji: item.emoji, name: item.name, img: imgSrc || null };
-        save();
-        renderPet();
+        // 从 emoji 推断动物类型
+        const emojiMap = {
+          '🐱': 'cat', '🐶': 'dog', '🐰': 'rabbit', '🐍': 'snake',
+          '🦊': 'fox', '🐻': 'bear', '🦝': 'raccoon', '🐹': 'hamster'
+        };
+        const animalType = item.type || emojiMap[item.emoji] || 'cat';
+        const pet = { emoji: item.emoji, name: item.name, img: imgSrc || null, type: animalType };
+        petManager.setCurrentPet(pet);
         collModal.classList.remove('show');
-        showBubble(`${item.name} 来陪你了。`, 2500);
       });
       grid.appendChild(cell);
     });
@@ -1288,7 +2425,6 @@ collModal.addEventListener('click', (e) => { if (e.target === collModal) collMod
 openHistoryBtn.addEventListener('click', () => {
   historyList.innerHTML = '';
   const dates = Object.keys(taskHistory).sort((a, b) => {
-    // 按日期降序
     return new Date(b.replace(/\//g, '-')) - new Date(a.replace(/\//g, '-'));
   });
   if (dates.length === 0) {
@@ -1326,7 +2462,6 @@ historyModal.addEventListener('click', (e) => { if (e.target === historyModal) h
 // ============================================================
 function checkYesterday() {
   if (lastOpenDate && lastOpenDate !== todayStr) {
-    // 有昨日未完成任务
     const undone = tasks.filter(t => !t.done);
     if (undone.length > 0) {
       document.getElementById('yesterday-msg').textContent =
@@ -1334,13 +2469,11 @@ function checkYesterday() {
       yesterdayModal.classList.add('show');
     }
   }
-  // 更新上次打开日期
   LS.set('sl_last_date', todayStr);
   lastOpenDate = todayStr;
 }
 
 document.getElementById('yesterday-keep').addEventListener('click', () => {
-  // 重置未完成任务状态（它们本来就是 done:false，不需操作），只关闭弹窗
   yesterdayModal.classList.remove('show');
   showBubble('未完成的任务留着，不着急，慢慢来。', 3000);
 });
@@ -1358,8 +2491,6 @@ document.getElementById('yesterday-close').addEventListener('click', () => {
 // ============================================================
 //  PWA 安装
 // ============================================================
-
-// 用 Canvas 生成 PNG 图标，注入动态 manifest（解决 Chrome 要求 PNG 的问题）
 function buildPWAManifest() {
   function drawIcon(size) {
     const c = document.createElement('canvas');
@@ -1367,7 +2498,6 @@ function buildPWAManifest() {
     const ctx = c.getContext('2d');
     const r = size * 0.12;
 
-    // 圆角背景
     ctx.fillStyle = '#FFF9C4';
     ctx.beginPath();
     ctx.moveTo(r, 0); ctx.lineTo(size - r, 0);
@@ -1378,14 +2508,12 @@ function buildPWAManifest() {
     ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
     ctx.closePath(); ctx.fill();
 
-    // 折角
     const cs = size * 0.22;
     ctx.fillStyle = '#e6d97a';
     ctx.beginPath();
     ctx.moveTo(size - cs, 0); ctx.lineTo(size, 0); ctx.lineTo(size, cs);
     ctx.closePath(); ctx.fill();
 
-    // 横线
     ctx.strokeStyle = '#c8b97a';
     ctx.lineWidth = size * 0.022;
     ctx.setLineDash([size * 0.045, size * 0.03]);
@@ -1394,7 +2522,6 @@ function buildPWAManifest() {
       ctx.beginPath(); ctx.moveTo(size * 0.16, y); ctx.lineTo(size * 0.72, y); ctx.stroke();
     }
 
-    // 📝 emoji
     ctx.setLineDash([]);
     ctx.font = `${Math.round(size * 0.38)}px serif`;
     ctx.textAlign = 'center';
@@ -1419,10 +2546,9 @@ function buildPWAManifest() {
     };
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
     document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(blob);
-  } catch (e) { /* 静默失败，继续使用静态 manifest.json */ }
+  } catch (e) { }
 }
 
-// file:// 协议提示
 function checkProtocol() {
   if (location.protocol !== 'file:') return;
   const banner = document.createElement('div');
@@ -1463,7 +2589,6 @@ window.addEventListener('appinstalled', () => {
   showBubble('已添加到桌面，下次直接从桌面打开就好。', 3500);
 });
 
-// 注册 Service Worker（仅 HTTP/HTTPS）
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
@@ -1472,7 +2597,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   });
 }
 
-// 入口
 buildPWAManifest();
 checkProtocol();
 
@@ -1483,7 +2607,6 @@ let isDragging = false;
 let dragOffsetX = 0, dragOffsetY = 0;
 
 sticky.addEventListener('mousedown', (e) => {
-  // 不在输入框、按钮、复选框上拖拽
   if (['INPUT','BUTTON','TEXTAREA'].includes(e.target.tagName)) return;
   isDragging = true;
   dragOffsetX = e.clientX - sticky.getBoundingClientRect().left;
@@ -1509,7 +2632,7 @@ document.addEventListener('mouseup', () => {
 });
 
 // ============================================================
-//  触摸拖拽（手机）—— 简单实现
+//  触摸拖拽（手机）
 // ============================================================
 let touchOffX = 0, touchOffY = 0;
 sticky.addEventListener('touchstart', (e) => {
@@ -1538,14 +2661,12 @@ sticky.addEventListener('touchend', () => {
 //  恢复位置
 // ============================================================
 function restorePosition() {
-  // 手机不做位置恢复
   if (window.innerWidth <= 480) return;
   const pos = LS.get('sl_pos', null);
   if (pos) {
     sticky.style.left = Math.min(pos.x, window.innerWidth  - sticky.offsetWidth)  + 'px';
     sticky.style.top  = Math.min(pos.y, window.innerHeight - sticky.offsetHeight) + 'px';
   } else {
-    // 默认居中偏左
     sticky.style.left = Math.max(0, (window.innerWidth  / 2 - 210)) + 'px';
     sticky.style.top  = Math.max(0, (window.innerHeight / 2 - 250)) + 'px';
   }
@@ -1559,7 +2680,6 @@ function triggerPetJump() {
   petDisplay.classList.remove('pet-float', 'pet-jump', 'pet-shake');
   void petDisplay.offsetWidth;
   petDisplay.classList.add('pet-jump');
-  // 跳跃结束后恢复浮动
   setTimeout(() => {
     petDisplay.classList.remove('pet-jump');
     petDisplay.classList.add('pet-float');
@@ -1571,7 +2691,6 @@ function triggerPetShake() {
   petDisplay.classList.remove('pet-float', 'pet-jump', 'pet-shake');
   void petDisplay.offsetWidth;
   petDisplay.classList.add('pet-shake');
-  // 摇晃结束后恢复浮动（0.4s × 3次）
   setTimeout(() => {
     petDisplay.classList.remove('pet-shake');
     petDisplay.classList.add('pet-float');
@@ -1610,12 +2729,11 @@ encourageSaveBtn.addEventListener('click', () => {
     .map(l => l.trim())
     .filter(l => l.length > 0);
 
-  // 自我攻击检测
   const bad = lines.find(l => SELF_ATTACK_RE.test(l) || SELF_ATTACK_RE2.test(l));
   if (bad) {
     encourageWarn.textContent = '不攻击自己，也是行动的一部分 💛';
     encourageWarn.style.display = 'block';
-    return; // 拒绝保存
+    return;
   }
 
   customEncouragements = lines;
@@ -1625,30 +2743,25 @@ encourageSaveBtn.addEventListener('click', () => {
 });
 
 // ============================================================
-//  打开桌宠助手（互动入口）
+//  打开桌宠助手
 // ============================================================
 document.getElementById('open-pet-helper').addEventListener('click', () => {
-  // 打开全屏像素桌宠助手页面
   location.href = 'pet.html';
 });
 
 // ============================================================
 //  🤖 Agent 行为系统
 // ============================================================
-// 感知 → 决策 → 行动
-// 每 30 秒执行一次 decide()；用户活动时调用 resetTimer()
-// 规则按优先级排序，命中即停止；同一规则 30 分钟内不重复触发
 const agent = {
   lastActiveTime: Date.now(),
-  cooldown: {},                          // {ruleId: 上次触发时间戳}
-  COOLDOWN_MS: 30 * 60 * 1000,           // 同一规则冷却 30 分钟
+  cooldown: {},
+  COOLDOWN_MS: 30 * 60 * 1000,
   centerRestoreTimer: null,
   centerOriginalPos: null,
   isAtCenter: false,
-  rules: [],                             // 在下方填充
-  celebrationRule: null,                 // 事件驱动的庆祝规则
+  rules: [],
+  celebrationRule: null,
 
-  // ---------- 感知 ----------
   sense() {
     const now = Date.now();
     const idleDuration = now - this.lastActiveTime;
@@ -1661,12 +2774,10 @@ const agent = {
     return { now, idleDuration, doneToday, hour, timeOfDay };
   },
 
-  // ---------- 重置最后活动时间 ----------
   resetTimer() {
     this.lastActiveTime = Date.now();
   },
 
-  // ---------- 冷却检查 ----------
   inCooldown(ruleId) {
     const last = this.cooldown[ruleId];
     return last && (Date.now() - last < this.COOLDOWN_MS);
@@ -1675,7 +2786,6 @@ const agent = {
     this.cooldown[ruleId] = Date.now();
   },
 
-  // ---------- 决策 ----------
   decide() {
     const ctx = this.sense();
     for (const rule of this.rules) {
@@ -1683,12 +2793,11 @@ const agent = {
       if (rule.condition(ctx)) {
         rule.action(ctx);
         this.markFired(rule.id);
-        break;  // 命中即停止，避免多条规则同时触发
+        break;
       }
     }
   },
 
-  // ---------- 任务完成事件（脱离 decide 循环） ----------
   onTaskCompleted() {
     const ctx = this.sense();
     const rule = this.celebrationRule;
@@ -1700,22 +2809,16 @@ const agent = {
   },
 };
 
-// ---------- 规则定义（按优先级从高到低） ----------
-
-// 规则1：久坐提醒（≥45 分钟无操作）
 agent.rules.push({
   id: 'sit-too-long',
   condition: (ctx) => ctx.idleDuration >= 45 * 60 * 1000,
   action: () => {
     triggerPetShake();
     showBubble('起来走一走，喝杯水 🌿', 5000);
-    moveStickyToCenter();
     addEgg(1);
   },
 });
 
-// 规则2：晚安提醒（≥30 分钟 且 时间 ≥22 点）
-// 注意：放在"温柔拉伸"之前，确保深夜的 30 分钟空闲优先匹配晚安
 agent.rules.push({
   id: 'good-night',
   condition: (ctx) => ctx.idleDuration >= 30 * 60 * 1000 && ctx.hour >= 22,
@@ -1724,7 +2827,6 @@ agent.rules.push({
   },
 });
 
-// 规则3：温柔拉伸（30 ≤ idle < 45 分钟）
 agent.rules.push({
   id: 'gentle-stretch',
   condition: (ctx) =>
@@ -1739,7 +2841,6 @@ agent.rules.push({
   },
 });
 
-// 规则4：早安鼓励（早晨 6-12 点 且 至今没有完成任务）
 agent.rules.push({
   id: 'morning-encourage',
   condition: (ctx) => ctx.timeOfDay === 'morning' && ctx.doneToday === 0,
@@ -1748,7 +2849,6 @@ agent.rules.push({
   },
 });
 
-// 规则5：庆祝（事件驱动 — 任务完成后调用，今日完成 ≥3 件）
 agent.celebrationRule = {
   id: 'celebrate',
   condition: (ctx) => ctx.doneToday >= 3,
@@ -1759,83 +2859,17 @@ agent.celebrationRule = {
 };
 
 // ============================================================
-//  便利贴临时移到屏幕中央（5 秒后复位，拖动则中断）
-// ============================================================
-function moveStickyToCenter() {
-  // 已经在中央则不重复移动
-  if (agent.isAtCenter) return;
-
-  agent.centerOriginalPos = {
-    position:  sticky.style.position,
-    left:      sticky.style.left,
-    top:       sticky.style.top,
-    transform: sticky.style.transform,
-  };
-
-  sticky.style.position  = 'fixed';
-  sticky.style.left      = '50%';
-  sticky.style.top       = '50%';
-  sticky.style.transform = 'translate(-50%, -50%)';
-  agent.isAtCenter = true;
-
-  agent.centerRestoreTimer = setTimeout(restoreStickyPos, 5000);
-}
-
-function restoreStickyPos() {
-  if (!agent.isAtCenter) return;
-  const orig = agent.centerOriginalPos;
-  if (orig) {
-    sticky.style.position  = orig.position  || 'absolute';
-    sticky.style.left      = orig.left      || '';
-    sticky.style.top       = orig.top       || '';
-    sticky.style.transform = orig.transform || '';
-  }
-  agent.isAtCenter = false;
-  agent.centerOriginalPos = null;
-  if (agent.centerRestoreTimer) {
-    clearTimeout(agent.centerRestoreTimer);
-    agent.centerRestoreTimer = null;
-  }
-}
-
-// 用户拖动便利贴 → 中断自动复位（让用户掌控位置）
-function cancelCenterRestore() {
-  if (!agent.isAtCenter) return;
-  if (agent.centerRestoreTimer) {
-    clearTimeout(agent.centerRestoreTimer);
-    agent.centerRestoreTimer = null;
-  }
-  agent.isAtCenter = false;
-  agent.centerOriginalPos = null;
-}
-sticky.addEventListener('mousedown',  cancelCenterRestore);
-sticky.addEventListener('touchstart', cancelCenterRestore, { passive: true });
-
-// ============================================================
-//  监听用户活动 → 重置 Agent 计时器
-// ============================================================
-['mousemove', 'keydown', 'click'].forEach(evt => {
-  document.addEventListener(evt, () => agent.resetTimer(), { passive: true });
-});
-
-// 启动决策循环（每 30 秒）
-setInterval(() => agent.decide(), 30 * 1000);
-
-// ============================================================
 //  初始化
 // ============================================================
 function init() {
   restorePosition();
-  applyColor(stickyColor);  // 恢复便利贴颜色
+  applyColor(stickyColor);
   renderEggs();
   renderPet();
   renderTasks();
-  checkYesterday();          // 检查昨日未完成任务
-  // 小动物初始浮动
+  checkYesterday();
   if (currentPet) petDisplay.classList.add('pet-float');
-  // 启动 Agent 计时器
   agent.resetTimer();
-  // 启动后立即跑一次决策（命中早安鼓励等无需等待的规则）
   setTimeout(() => agent.decide(), 1000);
 }
 

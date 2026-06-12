@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>同步测试工具 · 慢慢贴</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background:#f5f5f5; padding:20px; }
+    .panel { background:#fff; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    h1 { color:#333; margin-bottom:20px; font-size:20px; }
+    h2 { color:#666; margin:15px 0 10px; font-size:16px; }
+    .animal-btn {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:12px 20px; margin:8px;
+      background:#4CAF50; color:white;
+      border:none; border-radius:6px;
+      cursor:pointer; font-size:14px;
+      transition:all 0.2s;
+    }
+    .animal-btn:hover { background:#45a049; transform:scale(1.02); }
+    .animal-btn.active { background:#2E7D32; box-shadow:0 0 0 3px rgba(76,175,80,0.3); }
+    .status { padding:12px; border-radius:6px; margin:10px 0; font-family:monospace; font-size:12px; }
+    .status.success { background:#e8f5e9; color:#2e7d32; }
+    .status.warning { background:#fff3e0; color:#e65100; }
+    .status.info { background:#e3f2fd; color:#1565c0; }
+    .log { background:#1a1a1a; color:#00ff00; padding:15px; border-radius:6px; font-family:monospace; font-size:11px; max-height:200px; overflow-y:auto; }
+    .log-line { margin:2px 0; }
+    .log-time { color:#888; margin-right:8px; }
+    .log-event { color:#ff9800; margin-right:8px; }
+    .tip { background:#fff3cd; border-left:4px solid #ffc107; padding:10px 12px; margin-top:15px; font-size:13px; color:#856404; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>🐾 同步测试工具</h1>
+    <p>模拟在 index.html 中切换动物，验证 pet.html 是否能实时同步更新</p>
+    
+    <div class="tip">
+      <strong>测试步骤：</strong><br>
+      1. 打开 <a href="pet.html" target="_blank">pet.html</a>（桌宠页面）<br>
+      2. 点击下方按钮切换动物<br>
+      3. 观察 pet.html 是否立即同步显示新动物
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🎮 模拟切换动物</h2>
+    <div id="animal-buttons"></div>
+  </div>
+
+  <div class="panel">
+    <h2>📊 当前同步状态</h2>
+    <div id="current-status" class="status info"></div>
+    <div id="hatched-status" class="status info"></div>
+  </div>
+
+  <div class="panel">
+    <h2>📝 同步日志</h2>
+    <div id="sync-log" class="log"></div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  LS 辅助
+    // ============================================================
+    const LS = {
+      get(key, fallback) {
+        try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+        catch (e) { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+        catch (e) { return false; }
+      }
+    };
+
+    // ============================================================
+    //  动物数据（与 index.html / pet.html 保持一致）
+    // ============================================================
+    const ANIMALS = [
+      { type:'cat',      emoji:'🐱', name:'小猫咪', img:null },
+      { type:'dog',      emoji:'🐶', name:'小狗狗', img:null },
+      { type:'rabbit',   emoji:'🐰', name:'小兔子', img:null },
+      { type:'snake',    emoji:'🐍', name:'小蛇蛇', img:null },
+      { type:'fox',      emoji:'🦊', name:'小狐狸', img:null },
+      { type:'bear',     emoji:'🐻', name:'小熊熊', img:null },
+      { type:'raccoon',  emoji:'🦝', name:'小浣熊', img:null },
+      { type:'hamster',  emoji:'🐹', name:'小仓鼠', img:null },
+    ];
+
+    // ============================================================
+    //  DOM 元素
+    // ============================================================
+    const btnContainer = document.getElementById('animal-buttons');
+    const currentStatus = document.getElementById('current-status');
+    const hatchedStatus = document.getElementById('hatched-status');
+    const syncLog = document.getElementById('sync-log');
+
+    // ============================================================
+    //  日志函数
+    // ============================================================
+    function log(event, message) {
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+      const line = `<div class="log-line"><span class="log-time">[${timeStr}]</span><span class="log-event">${event}</span>${message}</div>`;
+      syncLog.innerHTML = line + syncLog.innerHTML;
+      // 保持最多 50 条日志
+      while (syncLog.children.length > 50) {
+        syncLog.removeChild(syncLog.lastChild);
+      }
+    }
+
+    // ============================================================
+    //  更新状态显示
+    // ============================================================
+    function updateStatus() {
+      const syncData = LS.get('sl_pet_sync', null);
+      const collection = LS.get('sl_collection', []);
+      
+      if (syncData) {
+        currentStatus.className = 'status success';
+        currentStatus.innerHTML = `
+          <strong>当前宠物：</strong>${syncData.emoji} ${syncData.name} (${syncData.type})<br>
+          <strong>同步时间：</strong>${new Date(syncData.ts).toLocaleString()}
+        `;
+      } else {
+        currentStatus.className = 'status warning';
+        currentStatus.innerHTML = '<strong>警告：</strong>未检测到同步数据，请先在慢慢贴中设置宠物';
+      }
+
+      hatchedStatus.className = 'status info';
+      hatchedStatus.innerHTML = `<strong>已孵化动物：</strong>${collection.length} 只<br>` +
+        collection.map(c => `${c.emoji} ${c.name}`).join(', ') || '暂无';
+    }
+
+    // ============================================================
+    //  模拟切换动物（模拟 index.html 的 petManager.setCurrentPet）
+    // ============================================================
+    function switchAnimal(animal) {
+      log('SET_PET', `切换到 ${animal.emoji} ${animal.name} (${animal.type})`);
+      
+      // 1. 更新同步键（触发 pet.html 的 storage 事件）
+      LS.set('sl_pet_sync', {
+        emoji: animal.emoji,
+        name: animal.name,
+        img: animal.img,
+        type: animal.type,
+        ts: Date.now(),
+      });
+
+      // 2. 确保该动物在 collection 中（模拟已孵化）
+      const collection = LS.get('sl_collection', []);
+      if (!collection.some(c => c.type === animal.type)) {
+        collection.push({
+          emoji: animal.emoji,
+          name: animal.name,
+          img: animal.img,
+          type: animal.type,
+          date: new Date().toLocaleDateString('zh-CN'),
+        });
+        LS.set('sl_collection', collection);
+        log('HATCH', `已添加 ${animal.emoji} ${animal.name} 到收集册`);
+      }
+
+      // 3. 更新按钮状态
+      updateButtons();
+      // 4. 更新状态显示
+      updateStatus();
+    }
+
+    // ============================================================
+    //  更新按钮状态
+    // ============================================================
+    function updateButtons() {
+      const syncData = LS.get('sl_pet_sync', null);
+      document.querySelectorAll('.animal-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === syncData?.type);
+      });
+    }
+
+    // ============================================================
+    //  初始化按钮
+    // ============================================================
+    function initButtons() {
+      ANIMALS.forEach(animal => {
+        const btn = document.createElement('button');
+        btn.className = 'animal-btn';
+        btn.dataset.type = animal.type;
+        btn.innerHTML = `${animal.emoji} ${animal.name}`;
+        btn.addEventListener('click', () => switchAnimal(animal));
+        btnContainer.appendChild(btn);
+      });
+    }
+
+    // ============================================================
+    //  监听 storage 变化（验证双向同步）
+    // ============================================================
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'sl_pet_sync' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          log('SYNC', `收到同步更新: ${data.emoji} ${data.name}`);
+          updateStatus();
+          updateButtons();
+        } catch (err) {
+          log('ERROR', '解析同步数据失败');
+        }
+      }
+      if (e.key === 'sl_collection') {
+        log('COLLECTION', '收集册已更新');
+        updateStatus();
+      }
+    });
+
+    // ============================================================
+    //  初始化
+    // ============================================================
+    initButtons();
+    updateStatus();
+    updateButtons();
+    log('INIT', '测试工具已就绪');
+  </script>
+</body>
+</html>
